@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using CveWebApp.Models;
 
 namespace CveWebApp.Controllers
@@ -21,9 +22,13 @@ namespace CveWebApp.Controllers
         }
 
         // GET: UserProvisioning
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             var model = new UserProvisioningViewModel();
+            
+            // Load existing users
+            await LoadExistingUsersAsync(model);
+            
             return View(model);
         }
 
@@ -39,6 +44,7 @@ namespace CveWebApp.Controllers
                 if (existingUser != null)
                 {
                     ModelState.AddModelError(string.Empty, "A user with this email address already exists.");
+                    await LoadExistingUsersAsync(model);
                     return View(model);
                 }
 
@@ -47,6 +53,7 @@ namespace CveWebApp.Controllers
                 if (existingUsername != null)
                 {
                     ModelState.AddModelError(string.Empty, "A user with this username already exists.");
+                    await LoadExistingUsersAsync(model);
                     return View(model);
                 }
 
@@ -54,16 +61,18 @@ namespace CveWebApp.Controllers
                 if (!await _roleManager.RoleExistsAsync(model.SelectedRole))
                 {
                     ModelState.AddModelError(string.Empty, "Selected role does not exist.");
+                    await LoadExistingUsersAsync(model);
                     return View(model);
                 }
 
                 // Create new user
                 var user = new ApplicationUser
                 {
-                    UserName = model.Username,
+                    UserName = model.Username,  // Keep separate username for flexibility
                     Email = model.Email,
                     EmailConfirmed = true,
-                    FullName = model.FullName
+                    FullName = model.FullName,
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 var result = await _userManager.CreateAsync(user, model.Password);
@@ -85,7 +94,123 @@ namespace CveWebApp.Controllers
                 }
             }
 
+            await LoadExistingUsersAsync(model);
             return View(model);
+        }
+
+        // GET: UserProvisioning/ManageRoles/{id}
+        public async Task<IActionResult> ManageRoles(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var allRoles = await _roleManager.Roles.Select(r => r.Name!).ToListAsync();
+
+            var model = new UserRoleManagementViewModel
+            {
+                UserId = user.Id,
+                Username = user.UserName!,
+                CurrentRoles = userRoles.ToList(),
+                AvailableRoles = allRoles,
+                SelectedRoles = userRoles.ToList()
+            };
+
+            return PartialView("_ManageRolesModal", model);
+        }
+
+        // POST: UserProvisioning/UpdateRoles
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateRoles(UserRoleManagementViewModel model)
+        {
+            var user = await _userManager.FindByIdAsync(model.UserId);
+            if (user == null)
+            {
+                return Json(new { success = false, message = "User not found." });
+            }
+
+            // Prevent admin from removing their own admin role
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId && !model.SelectedRoles.Contains("Admin"))
+            {
+                return Json(new { success = false, message = "You cannot remove your own Admin role." });
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            
+            // Remove user from all current roles
+            var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            if (!removeResult.Succeeded)
+            {
+                return Json(new { success = false, message = "Failed to update user roles." });
+            }
+
+            // Add user to selected roles
+            if (model.SelectedRoles.Any())
+            {
+                var addResult = await _userManager.AddToRolesAsync(user, model.SelectedRoles);
+                if (!addResult.Succeeded)
+                {
+                    return Json(new { success = false, message = "Failed to update user roles." });
+                }
+            }
+
+            return Json(new { success = true, message = $"Roles updated successfully for {user.UserName}." });
+        }
+
+        // POST: UserProvisioning/DeleteUser
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return Json(new { success = false, message = "User not found." });
+            }
+
+            // Prevent admin from deleting their own account
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId)
+            {
+                return Json(new { success = false, message = "You cannot delete your own account." });
+            }
+
+            var result = await _userManager.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                return Json(new { success = true, message = $"User '{user.UserName}' has been deleted successfully." });
+            }
+
+            return Json(new { success = false, message = "Failed to delete user." });
+        }
+
+        private async Task LoadExistingUsersAsync(UserProvisioningViewModel model)
+        {
+            var users = await _userManager.Users.ToListAsync();
+            var currentUserId = _userManager.GetUserId(User);
+
+            foreach (var user in users)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                model.ExistingUsers.Add(new UserManagementItem
+                {
+                    Id = user.Id,
+                    Username = user.UserName!,
+                    Email = user.Email!,
+                    FullName = user.FullName ?? "",
+                    Roles = roles.ToList(),
+                    CreatedAt = user.CreatedAt,
+                    IsCurrentUser = user.Id == currentUserId
+                });
+            }
+
+            // Sort by creation date, newest first
+            model.ExistingUsers = model.ExistingUsers.OrderByDescending(u => u.CreatedAt).ToList();
         }
     }
 }

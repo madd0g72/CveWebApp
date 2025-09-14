@@ -16,6 +16,7 @@ namespace CveWebApp.Data
 
         public DbSet<CveUpdateStaging> CveUpdateStagings { get; set; }
         public DbSet<ServerInstalledKb> ServerInstalledKbs { get; set; }
+        public DbSet<LoginAttempt> LoginAttempts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -42,6 +43,20 @@ namespace CveWebApp.Data
             modelBuilder.Entity<ServerInstalledKb>()
                 .HasIndex(e => new { e.Computer, e.KB })
                 .IsUnique();
+
+            // Configure LoginAttempt entity
+            modelBuilder.Entity<LoginAttempt>()
+                .ToTable("LoginAttempts");
+
+            // Create indexes for better query performance
+            modelBuilder.Entity<LoginAttempt>()
+                .HasIndex(e => e.Timestamp);
+
+            modelBuilder.Entity<LoginAttempt>()
+                .HasIndex(e => e.Username);
+
+            modelBuilder.Entity<LoginAttempt>()
+                .HasIndex(e => e.IsSuccess);
         }
     }
 }
