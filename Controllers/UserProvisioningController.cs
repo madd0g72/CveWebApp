@@ -68,7 +68,7 @@ namespace CveWebApp.Controllers
                 // Create new user
                 var user = new ApplicationUser
                 {
-                    UserName = model.Username,
+                    UserName = model.Username,  // Keep separate username for flexibility
                     Email = model.Email,
                     EmailConfirmed = true,
                     FullName = model.FullName,

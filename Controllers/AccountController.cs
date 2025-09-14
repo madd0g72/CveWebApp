@@ -40,7 +40,18 @@ namespace CveWebApp.Controllers
             
             if (ModelState.IsValid)
             {
+                // First try to login with the provided value as username
                 var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
+                
+                // If that fails and the input looks like an email, try to find user by email and use their username
+                if (!result.Succeeded && model.Email.Contains("@"))
+                {
+                    var userByEmail = await _userManager.FindByEmailAsync(model.Email);
+                    if (userByEmail != null)
+                    {
+                        result = await _signInManager.PasswordSignInAsync(userByEmail.UserName!, model.Password, model.RememberMe, lockoutOnFailure: false);
+                    }
+                }
                 
                 var user = await _userManager.FindByEmailAsync(model.Email);
                 var sourceIP = GetClientIpAddress();
