@@ -150,8 +150,9 @@
                 <div class="col-md-4">
                     <div class="form-group mb-3">
                         <div class="form-check">
-                            <input class="form-check-input" asp-for="CustomerActionRequired" type="checkbox" />
-                            <label class="form-check-label" asp-for="CustomerActionRequired">
+                            <input class="form-check-input" name="CustomerActionRequired" value="true" type="checkbox" />
+                            <input name="CustomerActionRequired" type="hidden" value="false" />
+                            <label class="form-check-label" for="CustomerActionRequired">
                                 Customer Action Required
                             </label>
                         </div>
