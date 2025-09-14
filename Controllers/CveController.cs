@@ -181,19 +181,27 @@ namespace CveWebApp.Controllers
             if (string.IsNullOrEmpty(article))
                 return new List<string>();
 
-            var kbs = new List<string>();
+            var kbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
-            // Look for KB patterns like "KB1234567" or "kb1234567"
+            // First, look for KB patterns like "KB1234567" or "kb1234567"
             var kbPattern = new System.Text.RegularExpressions.Regex(@"\bKB\d{6,7}\b", 
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            
             var matches = kbPattern.Matches(article);
             foreach (System.Text.RegularExpressions.Match match in matches)
             {
                 kbs.Add(match.Value.ToUpper());
             }
 
-            return kbs.Distinct().ToList();
+            // Then, look for bare 6-7 digit numbers and normalize them to KB format
+            var bareNumberPattern = new System.Text.RegularExpressions.Regex(@"\b\d{6,7}\b");
+            var bareMatches = bareNumberPattern.Matches(article);
+            foreach (System.Text.RegularExpressions.Match match in bareMatches)
+            {
+                var kbFormatted = "KB" + match.Value;
+                kbs.Add(kbFormatted);
+            }
+
+            return kbs.ToList();
         }
 
         private async Task<List<ServerInstalledKb>> GetMatchingServersAsync(string? product, string? productFamily)
