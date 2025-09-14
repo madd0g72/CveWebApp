@@ -129,7 +129,7 @@
         {
             foreach (var item in Model)
             {
-                var rowClass = (item.BaseScore >= 8) ? "table-danger high-score-row" : "";
+                var rowClass = (item.BaseScore > 8.0m) ? "table-danger high-score-row" : "";
                 <tr class="@rowClass">
                     <td>@item.ReleaseDate?.ToString("yyyy-MM-dd")</td>
                     <td>@item.ProductFamily</td>
