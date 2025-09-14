@@ -34,5 +34,36 @@ namespace CveWebApp.Models
         /// Available roles for selection
         /// </summary>
         public List<string> AvailableRoles { get; set; } = new List<string> { "Admin", "User", "operator" };
+
+        /// <summary>
+        /// List of existing users for management
+        /// </summary>
+        public List<UserManagementItem> ExistingUsers { get; set; } = new List<UserManagementItem>();
+    }
+
+    /// <summary>
+    /// Represents a user in the management table
+    /// </summary>
+    public class UserManagementItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new List<string>();
+        public DateTime CreatedAt { get; set; }
+        public bool IsCurrentUser { get; set; }
+    }
+
+    /// <summary>
+    /// View model for role management operations
+    /// </summary>
+    public class UserRoleManagementViewModel
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public List<string> CurrentRoles { get; set; } = new List<string>();
+        public List<string> AvailableRoles { get; set; } = new List<string> { "Admin", "User", "operator" };
+        public List<string> SelectedRoles { get; set; } = new List<string>();
     }
 }
