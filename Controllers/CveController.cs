@@ -100,6 +100,118 @@ namespace CveWebApp.Controllers
             return View(cveUpdateStaging);
         }
 
+        // GET: Cve/ComplianceOverview/5
+        public async Task<IActionResult> ComplianceOverview(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cveDetails = await _context.CveUpdateStagings
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (cveDetails == null)
+            {
+                return NotFound();
+            }
+
+            var viewModel = await BuildComplianceViewModelAsync(cveDetails);
+            return View(viewModel);
+        }
+
+        private async Task<ComplianceViewModel> BuildComplianceViewModelAsync(CveUpdateStaging cveDetails)
+        {
+            var viewModel = new ComplianceViewModel
+            {
+                CveDetails = cveDetails
+            };
+
+            // Extract required KBs from the Article field
+            viewModel.RequiredKbs = ExtractKbsFromArticle(cveDetails.Article);
+
+            if (string.IsNullOrEmpty(cveDetails.Product) && string.IsNullOrEmpty(cveDetails.ProductFamily))
+            {
+                // No product information to match against
+                return viewModel;
+            }
+
+            // Get all servers with matching OS products
+            var matchingServers = await GetMatchingServersAsync(cveDetails.Product, cveDetails.ProductFamily);
+
+            // Group servers by computer name and calculate compliance
+            var serverGroups = matchingServers
+                .GroupBy(s => new { s.Computer, s.OSProduct })
+                .Select(g => new ServerComplianceStatus
+                {
+                    Computer = g.Key.Computer,
+                    OSProduct = g.Key.OSProduct,
+                    InstalledKbs = g.Select(s => s.KB).Distinct().ToList()
+                })
+                .ToList();
+
+            // Calculate compliance for each server
+            foreach (var server in serverGroups)
+            {
+                server.MissingKbs = viewModel.RequiredKbs
+                    .Where(reqKb => !server.InstalledKbs.Any(installedKb => 
+                        installedKb.Equals(reqKb, StringComparison.OrdinalIgnoreCase) ||
+                        installedKb.Equals(reqKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                        ("KB" + installedKb).Equals(reqKb, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                
+                server.IsCompliant = server.MissingKbs.Count == 0 && viewModel.RequiredKbs.Count > 0;
+            }
+
+            viewModel.ServerStatuses = serverGroups.OrderBy(s => s.Computer).ToList();
+
+            // Calculate summary
+            viewModel.Summary = new ComplianceSummary
+            {
+                TotalServers = viewModel.ServerStatuses.Count,
+                CompliantServers = viewModel.ServerStatuses.Count(s => s.IsCompliant),
+                NonCompliantServers = viewModel.ServerStatuses.Count(s => !s.IsCompliant)
+            };
+
+            return viewModel;
+        }
+
+        private List<string> ExtractKbsFromArticle(string? article)
+        {
+            if (string.IsNullOrEmpty(article))
+                return new List<string>();
+
+            var kbs = new List<string>();
+            
+            // Look for KB patterns like "KB1234567" or "kb1234567"
+            var kbPattern = new System.Text.RegularExpressions.Regex(@"\bKB\d{6,7}\b", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            var matches = kbPattern.Matches(article);
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                kbs.Add(match.Value.ToUpper());
+            }
+
+            return kbs.Distinct().ToList();
+        }
+
+        private async Task<List<ServerInstalledKb>> GetMatchingServersAsync(string? product, string? productFamily)
+        {
+            var query = _context.ServerInstalledKbs.AsQueryable();
+
+            if (!string.IsNullOrEmpty(product))
+            {
+                query = query.Where(s => s.OSProduct.Contains(product));
+            }
+            else if (!string.IsNullOrEmpty(productFamily))
+            {
+                query = query.Where(s => s.OSProduct.Contains(productFamily));
+            }
+
+            return await query.ToListAsync();
+        }
+
         // GET: Cve/Import
         public IActionResult Import()
         {
