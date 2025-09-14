@@ -1,0 +1,111 @@
+@model CveWebApp.Models.UserProvisioningViewModel
+
+@{
+    ViewData["Title"] = "User Provisioning";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <h2>@ViewData["Title"]</h2>
+        <p class="text-muted">Create new application users and assign roles.</p>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form asp-action="Index" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Username" class="form-label"></label>
+                        <input asp-for="Username" class="form-control" />
+                        <span asp-validation-for="Username" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" type="email" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="FullName" class="form-label"></label>
+                        <input asp-for="FullName" class="form-control" />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control" type="password" />
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                        <div class="form-text">Password must be at least 4 characters long.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="SelectedRole" class="form-label"></label>
+                        <select asp-for="SelectedRole" class="form-select">
+                            <option value="">-- Select Role --</option>
+                            @foreach (var role in Model.AvailableRoles)
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                        <span asp-validation-for="SelectedRole" class="text-danger"></span>
+                        <div class="form-text">
+                            <strong>Admin:</strong> Full system access<br />
+                            <strong>User:</strong> Standard user access<br />
+                            <strong>operator:</strong> Operational user access
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Create User
+                </button>
+                <a asp-controller="Home" asp-action="Index" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Role Descriptions</h5>
+            </div>
+            <div class="card-body">
+                <dl>
+                    <dt>Admin</dt>
+                    <dd>Full administrative access including user management, CVE data import, and system configuration.</dd>
+                    
+                    <dt>User</dt>
+                    <dd>Standard user access to view CVE data and dashboards.</dd>
+                    
+                    <dt>operator</dt>
+                    <dd>Operational access for users who need to perform specific tasks beyond standard viewing.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

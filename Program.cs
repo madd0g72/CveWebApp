@@ -105,7 +105,7 @@ app.Run();
 async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
 {
     // Create roles if they don't exist
-    string[] roleNames = { "Admin", "User" };
+    string[] roleNames = { "Admin", "User", "operator" };
     foreach (var roleName in roleNames)
     {
         if (!await roleManager.RoleExistsAsync(roleName))
