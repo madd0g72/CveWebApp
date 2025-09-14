@@ -59,7 +59,7 @@
                     <div class="col-md-3">
                         <div class="border-end">
                             <h4 class="text-success">@Model.Summary.CompliantServers</h4>
-                            <p class="text-muted mb-0">Compliant</p>
+                            <p class="text-muted mb-0">@(Model.RequiredKbs.Count == 0 ? "Not Applicable" : "Compliant")</p>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -102,7 +102,7 @@
                     <tbody>
                         @foreach (var server in Model.ServerStatuses)
                         {
-                            <tr class="@(server.IsCompliant ? "table-success" : "table-warning")">
+                            <tr class="@(server.IsCompliant ? (Model.RequiredKbs.Count == 0 ? "table-light" : "table-success") : "table-warning")">
                                 <td>
                                     <strong>@server.Computer</strong>
                                 </td>
@@ -110,9 +110,18 @@
                                 <td>
                                     @if (server.IsCompliant)
                                     {
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-check-circle"></i> Compliant
-                                        </span>
+                                        @if (Model.RequiredKbs.Count == 0)
+                                        {
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-dash-circle"></i> Not Applicable
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Compliant
+                                            </span>
+                                        }
                                     }
                                     else
                                     {
