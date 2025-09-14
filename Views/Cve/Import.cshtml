@@ -1,0 +1,103 @@
+@{
+    ViewData["Title"] = "Import CVE Data";
+}
+
+<h1>Import CVE Data</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="Import" method="post" enctype="multipart/form-data" class="card">
+            <div class="card-header">
+                <h4>Upload CSV File</h4>
+            </div>
+            <div class="card-body">
+                @if (ViewBag.SuccessMessage != null)
+                {
+                    <div class="alert alert-success" role="alert">
+                        @ViewBag.SuccessMessage
+                    </div>
+                }
+
+                @if (ViewBag.ErrorMessage != null)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @ViewBag.ErrorMessage
+                    </div>
+                }
+
+                @if (ViewBag.Errors != null)
+                {
+                    <div class="alert alert-warning" role="alert">
+                        <h6>Import Errors:</h6>
+                        <ul class="mb-0">
+                            @foreach (var error in ViewBag.Errors as List<string>)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="form-group mb-3">
+                    <label for="csvFile" class="form-label">Select CSV File:</label>
+                    <input type="file" name="csvFile" id="csvFile" class="form-control" accept=".csv" required />
+                    <div class="form-text">
+                        Select a CSV file containing CVE data. The file should include headers matching the CVE fields.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-upload"></i> Import CVE Data
+                </button>
+                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>CSV Format Requirements</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Required Headers:</strong></p>
+                <ul class="small">
+                    <li><code>Id</code> - Unique identifier (integer)</li>
+                    <li><code>Release Date</code> - Date in readable format</li>
+                    <li><code>Product Family</code> - Product family name</li>
+                    <li><code>Product</code> - Product name</li>
+                    <li><code>Platform</code> - Platform information</li>
+                    <li><code>Impact</code> - Impact description</li>
+                    <li><code>Max Severity</code> - Severity level</li>
+                    <li><code>Article</code> - Article reference</li>
+                    <li><code>Article Link</code> - URL to article</li>
+                    <li><code>Supercedence</code> - Supercedence info</li>
+                    <li><code>Download</code> - Download reference</li>
+                    <li><code>Download Link</code> - Download URL</li>
+                    <li><code>Build Number</code> - Build information</li>
+                    <li><code>Details</code> - CVE details/identifier</li>
+                    <li><code>Details Link</code> - CVE details URL</li>
+                    <li><code>Base Score</code> - Decimal score</li>
+                    <li><code>Temporal Score</code> - Decimal score</li>
+                    <li><code>Customer Action Required</code> - Yes/No or True/False</li>
+                </ul>
+                
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Note:</strong> 
+                        <ul class="mb-0">
+                            <li>Existing records will be updated based on the Id field</li>
+                            <li>New records will be inserted if Id doesn't exist</li>
+                            <li>Empty values will be ignored for updates</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
