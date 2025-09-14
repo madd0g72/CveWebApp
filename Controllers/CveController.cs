@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
+using System.Globalization;
 
 namespace CveWebApp.Controllers
 {
@@ -97,6 +98,303 @@ namespace CveWebApp.Controllers
             }
 
             return View(cveUpdateStaging);
+        }
+
+        // GET: Cve/Import
+        public IActionResult Import()
+        {
+            return View();
+        }
+
+        // POST: Cve/Import
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Import(IFormFile csvFile)
+        {
+            if (csvFile == null || csvFile.Length == 0)
+            {
+                ModelState.AddModelError("", "Please select a CSV file to upload.");
+                return View();
+            }
+
+            if (!csvFile.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError("", "Please upload a CSV file with .csv extension.");
+                return View();
+            }
+
+            // Check file size (limit to 10MB)
+            if (csvFile.Length > 10 * 1024 * 1024)
+            {
+                ModelState.AddModelError("", "File size cannot exceed 10MB.");
+                return View();
+            }
+
+            try
+            {
+                var importedCount = 0;
+                var updatedCount = 0;
+                var errors = new List<string>();
+                var warnings = new List<string>();
+
+                using (var reader = new StringReader(await new StreamReader(csvFile.OpenReadStream()).ReadToEndAsync()))
+                {
+                    string? line;
+                    var lineNumber = 0;
+                    string[]? headers = null;
+
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        lineNumber++;
+                        
+                        if (lineNumber == 1)
+                        {
+                            // Parse header row
+                            headers = ParseCsvLine(line);
+                            
+                            // Validate that we have essential headers
+                            if (!HasRequiredHeaders(headers))
+                            {
+                                ModelState.AddModelError("", "CSV file must contain at least 'Id' header. Please check the format requirements.");
+                                return View();
+                            }
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        try
+                        {
+                            var values = ParseCsvLine(line);
+                            var cveRecord = ParseCveRecord(headers!, values, lineNumber);
+                            
+                            if (cveRecord != null)
+                            {
+                                // Validate that Id is provided and positive
+                                if (cveRecord.Id <= 0)
+                                {
+                                    errors.Add($"Line {lineNumber}: Id must be a positive integer");
+                                    continue;
+                                }
+
+                                // Check if record exists by Id
+                                var existingRecord = await _context.CveUpdateStagings
+                                    .FirstOrDefaultAsync(c => c.Id == cveRecord.Id);
+
+                                if (existingRecord != null)
+                                {
+                                    // Update existing record
+                                    UpdateExistingRecord(existingRecord, cveRecord);
+                                    updatedCount++;
+                                }
+                                else
+                                {
+                                    // Add new record
+                                    _context.CveUpdateStagings.Add(cveRecord);
+                                    importedCount++;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add($"Line {lineNumber}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Save changes if we have records to process and not too many errors
+                if ((importedCount > 0 || updatedCount > 0) && errors.Count < 10)
+                {
+                    await _context.SaveChangesAsync();
+                    ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}, Updated records: {updatedCount}";
+                    
+                    if (errors.Count > 0)
+                    {
+                        ViewBag.SuccessMessage += $" ({errors.Count} rows skipped due to errors)";
+                        ViewBag.Warnings = errors;
+                    }
+                }
+                else if (errors.Count >= 10)
+                {
+                    ViewBag.ErrorMessage = $"Import failed: Too many errors ({errors.Count}). Please check your CSV file format and fix the issues.";
+                    ViewBag.Errors = errors.Take(10).ToList(); // Show first 10 errors
+                }
+                else if (importedCount == 0 && updatedCount == 0)
+                {
+                    ViewBag.ErrorMessage = "No valid records found to import. Please check your CSV file format.";
+                    if (errors.Count > 0)
+                    {
+                        ViewBag.Errors = errors;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("", $"Error processing file: {ex.Message}");
+            }
+
+            return View();
+        }
+
+        private bool HasRequiredHeaders(string[] headers)
+        {
+            return headers.Any(h => h.Trim().ToLowerInvariant() == "id");
+        }
+
+        private string[] ParseCsvLine(string line)
+        {
+            var values = new List<string>();
+            var inQuotes = false;
+            var currentValue = "";
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    values.Add(currentValue.Trim());
+                    currentValue = "";
+                }
+                else
+                {
+                    currentValue += c;
+                }
+            }
+
+            values.Add(currentValue.Trim());
+            return values.ToArray();
+        }
+
+        private CveUpdateStaging? ParseCveRecord(string[] headers, string[] values, int lineNumber)
+        {
+            if (headers.Length != values.Length)
+            {
+                throw new Exception($"Column count mismatch. Expected {headers.Length}, got {values.Length}");
+            }
+
+            var record = new CveUpdateStaging();
+
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var header = headers[i].Trim().ToLowerInvariant();
+                var value = values[i].Trim();
+
+                if (string.IsNullOrEmpty(value))
+                    continue;
+
+                try
+                {
+                    switch (header)
+                    {
+                        case "id":
+                            record.Id = int.Parse(value);
+                            break;
+                        case "releasedate":
+                        case "release date":
+                            if (DateTime.TryParse(value, out var releaseDate))
+                                record.ReleaseDate = releaseDate;
+                            break;
+                        case "productfamily":
+                        case "product family":
+                            record.ProductFamily = value;
+                            break;
+                        case "product":
+                            record.Product = value;
+                            break;
+                        case "platform":
+                            record.Platform = value;
+                            break;
+                        case "impact":
+                            record.Impact = value;
+                            break;
+                        case "maxseverity":
+                        case "max severity":
+                            record.MaxSeverity = value;
+                            break;
+                        case "article":
+                            record.Article = value;
+                            break;
+                        case "articlelink":
+                        case "article link":
+                            record.ArticleLink = value;
+                            break;
+                        case "supercedence":
+                            record.Supercedence = value;
+                            break;
+                        case "download":
+                            record.Download = value;
+                            break;
+                        case "downloadlink":
+                        case "download link":
+                            record.DownloadLink = value;
+                            break;
+                        case "buildnumber":
+                        case "build number":
+                            record.BuildNumber = value;
+                            break;
+                        case "details":
+                        case "cve":
+                            record.Details = value;
+                            break;
+                        case "detailslink":
+                        case "details link":
+                            record.DetailsLink = value;
+                            break;
+                        case "basescore":
+                        case "base score":
+                            if (decimal.TryParse(value, out var baseScore))
+                                record.BaseScore = baseScore;
+                            break;
+                        case "temporalscore":
+                        case "temporal score":
+                            if (decimal.TryParse(value, out var temporalScore))
+                                record.TemporalScore = temporalScore;
+                            break;
+                        case "customeractionrequired":
+                        case "customer action required":
+                            if (bool.TryParse(value, out var actionRequired))
+                                record.CustomerActionRequired = actionRequired;
+                            else if (value.ToLowerInvariant() == "yes" || value == "1")
+                                record.CustomerActionRequired = true;
+                            else if (value.ToLowerInvariant() == "no" || value == "0")
+                                record.CustomerActionRequired = false;
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Error parsing column '{header}' with value '{value}': {ex.Message}");
+                }
+            }
+
+            return record;
+        }
+
+        private void UpdateExistingRecord(CveUpdateStaging existing, CveUpdateStaging updated)
+        {
+            existing.ReleaseDate = updated.ReleaseDate ?? existing.ReleaseDate;
+            existing.ProductFamily = updated.ProductFamily ?? existing.ProductFamily;
+            existing.Product = updated.Product ?? existing.Product;
+            existing.Platform = updated.Platform ?? existing.Platform;
+            existing.Impact = updated.Impact ?? existing.Impact;
+            existing.MaxSeverity = updated.MaxSeverity ?? existing.MaxSeverity;
+            existing.Article = updated.Article ?? existing.Article;
+            existing.ArticleLink = updated.ArticleLink ?? existing.ArticleLink;
+            existing.Supercedence = updated.Supercedence ?? existing.Supercedence;
+            existing.Download = updated.Download ?? existing.Download;
+            existing.DownloadLink = updated.DownloadLink ?? existing.DownloadLink;
+            existing.BuildNumber = updated.BuildNumber ?? existing.BuildNumber;
+            existing.Details = updated.Details ?? existing.Details;
+            existing.DetailsLink = updated.DetailsLink ?? existing.DetailsLink;
+            existing.BaseScore = updated.BaseScore ?? existing.BaseScore;
+            existing.TemporalScore = updated.TemporalScore ?? existing.TemporalScore;
+            existing.CustomerActionRequired = updated.CustomerActionRequired ?? existing.CustomerActionRequired;
         }
     }
 }
