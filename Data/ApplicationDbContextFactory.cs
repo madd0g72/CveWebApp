@@ -1,22 +1,28 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace CveWebApp.Data
 {
     /// <summary>
-    /// Factory for creating ApplicationDbContext at design time for migrations
+    /// Design-time factory for ApplicationDbContext to support EF Core CLI commands.
     /// </summary>
     public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
     {
         public ApplicationDbContext CreateDbContext(string[] args)
         {
-            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            
-            // Use in-memory database for design-time operations
-            optionsBuilder.UseInMemoryDatabase("DesignTimeDatabase");
-            
-            return new ApplicationDbContext(optionsBuilder.Options);
+            IConfigurationRoot configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false)
+                .Build();
+
+            var builder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+            builder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+
+            return new ApplicationDbContext(builder.Options);
         }
     }
 }
