@@ -119,7 +119,14 @@ namespace CveWebApp.Controllers
 
             if (!csvFile.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
             {
-                ModelState.AddModelError("", "Please upload a CSV file.");
+                ModelState.AddModelError("", "Please upload a CSV file with .csv extension.");
+                return View();
+            }
+
+            // Check file size (limit to 10MB)
+            if (csvFile.Length > 10 * 1024 * 1024)
+            {
+                ModelState.AddModelError("", "File size cannot exceed 10MB.");
                 return View();
             }
 
@@ -128,6 +135,7 @@ namespace CveWebApp.Controllers
                 var importedCount = 0;
                 var updatedCount = 0;
                 var errors = new List<string>();
+                var warnings = new List<string>();
 
                 using (var reader = new StringReader(await new StreamReader(csvFile.OpenReadStream()).ReadToEndAsync()))
                 {
@@ -143,6 +151,13 @@ namespace CveWebApp.Controllers
                         {
                             // Parse header row
                             headers = ParseCsvLine(line);
+                            
+                            // Validate that we have essential headers
+                            if (!HasRequiredHeaders(headers))
+                            {
+                                ModelState.AddModelError("", "CSV file must contain at least 'Id' header. Please check the format requirements.");
+                                return View();
+                            }
                             continue;
                         }
 
@@ -156,6 +171,13 @@ namespace CveWebApp.Controllers
                             
                             if (cveRecord != null)
                             {
+                                // Validate that Id is provided and positive
+                                if (cveRecord.Id <= 0)
+                                {
+                                    errors.Add($"Line {lineNumber}: Id must be a positive integer");
+                                    continue;
+                                }
+
                                 // Check if record exists by Id
                                 var existingRecord = await _context.CveUpdateStagings
                                     .FirstOrDefaultAsync(c => c.Id == cveRecord.Id);
@@ -181,21 +203,30 @@ namespace CveWebApp.Controllers
                     }
                 }
 
-                if (errors.Count > 0 && errors.Count < 10) // Only save if there are few errors
+                // Save changes if we have records to process and not too many errors
+                if ((importedCount > 0 || updatedCount > 0) && errors.Count < 10)
                 {
                     await _context.SaveChangesAsync();
-                    ViewBag.SuccessMessage = $"Import completed with {errors.Count} errors. Imported: {importedCount}, Updated: {updatedCount}";
-                    ViewBag.Errors = errors;
+                    ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}, Updated records: {updatedCount}";
+                    
+                    if (errors.Count > 0)
+                    {
+                        ViewBag.SuccessMessage += $" ({errors.Count} rows skipped due to errors)";
+                        ViewBag.Warnings = errors;
+                    }
                 }
-                else if (errors.Count == 0)
+                else if (errors.Count >= 10)
                 {
-                    await _context.SaveChangesAsync();
-                    ViewBag.SuccessMessage = $"Import completed successfully! Imported: {importedCount}, Updated: {updatedCount}";
-                }
-                else
-                {
-                    ViewBag.ErrorMessage = $"Import failed with {errors.Count} errors. Please check your CSV file format.";
+                    ViewBag.ErrorMessage = $"Import failed: Too many errors ({errors.Count}). Please check your CSV file format and fix the issues.";
                     ViewBag.Errors = errors.Take(10).ToList(); // Show first 10 errors
+                }
+                else if (importedCount == 0 && updatedCount == 0)
+                {
+                    ViewBag.ErrorMessage = "No valid records found to import. Please check your CSV file format.";
+                    if (errors.Count > 0)
+                    {
+                        ViewBag.Errors = errors;
+                    }
                 }
             }
             catch (Exception ex)
@@ -204,6 +235,11 @@ namespace CveWebApp.Controllers
             }
 
             return View();
+        }
+
+        private bool HasRequiredHeaders(string[] headers)
+        {
+            return headers.Any(h => h.Trim().ToLowerInvariant() == "id");
         }
 
         private string[] ParseCsvLine(string line)

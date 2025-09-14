@@ -25,9 +25,22 @@
                     </div>
                 }
 
-                @if (ViewBag.Errors != null)
+                @if (ViewBag.Warnings != null)
                 {
                     <div class="alert alert-warning" role="alert">
+                        <h6>Import Warnings:</h6>
+                        <ul class="mb-0">
+                            @foreach (var warning in ViewBag.Warnings as List<string>)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (ViewBag.Errors != null)
+                {
+                    <div class="alert alert-danger" role="alert">
                         <h6>Import Errors:</h6>
                         <ul class="mb-0">
                             @foreach (var error in ViewBag.Errors as List<string>)
