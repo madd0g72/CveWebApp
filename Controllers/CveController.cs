@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using YourAppNamespace.Data; // Adjust to your actual namespace
-using YourAppNamespace.Models; // Adjust to your actual namespace
+using CVEWebApp.Data; // Adjust to your actual namespace
+using CVEWebApp.Models; // Adjust to your actual namespace
 
-namespace YourAppNamespace.Controllers
+namespace CVEWebApp.Controllers
 {
     public class CveController : Controller
     {
