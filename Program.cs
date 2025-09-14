@@ -169,7 +169,6 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
     {
         new CveUpdateStaging
         {
-            Id = 1,
             ReleaseDate = DateTime.Now.AddDays(-30),
             ProductFamily = "Windows",
             Product = "Windows 10",
@@ -183,7 +182,6 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
         },
         new CveUpdateStaging
         {
-            Id = 2,
             ReleaseDate = DateTime.Now.AddDays(-15),
             ProductFamily = "Windows",
             Product = "Windows 11",
@@ -197,7 +195,6 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
         },
         new CveUpdateStaging
         {
-            Id = 3,
             ReleaseDate = DateTime.Now.AddDays(-7),
             ProductFamily = "Office",
             Product = "Microsoft Office 2019",
