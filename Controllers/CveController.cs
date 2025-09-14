@@ -464,13 +464,23 @@ namespace CveWebApp.Controllers
                             break;
                         case "basescore":
                         case "base score":
-                            if (decimal.TryParse(value, out var baseScore))
-                                record.BaseScore = baseScore;
+                            if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var baseScore))
+                            {
+                                if (baseScore >= 0.0m && baseScore <= 10.0m)
+                                    record.BaseScore = baseScore;
+                                // Note: Invalid range values are silently ignored to allow data import to continue
+                            }
+                            // Note: Invalid format values are silently ignored to allow data import to continue
                             break;
                         case "temporalscore":
                         case "temporal score":
-                            if (decimal.TryParse(value, out var temporalScore))
-                                record.TemporalScore = temporalScore;
+                            if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var temporalScore))
+                            {
+                                if (temporalScore >= 0.0m && temporalScore <= 10.0m)
+                                    record.TemporalScore = temporalScore;
+                                // Note: Invalid range values are silently ignored to allow data import to continue
+                            }
+                            // Note: Invalid format values are silently ignored to allow data import to continue
                             break;
                         case "customeractionrequired":
                         case "customer action required":
