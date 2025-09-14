@@ -1,8 +1,55 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "CVE Search - Home Page";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container">
+    <div class="text-center mb-4">
+        <h1 class="display-4">CVE Search Portal</h1>
+        <p class="lead">Search for Common Vulnerabilities and Exposures (CVE) information</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Search for CVE</h3>
+                </div>
+                <div class="card-body">
+                    <form asp-action="SearchByCve" method="post" class="mb-3">
+                        <div class="form-group mb-3">
+                            <label for="cveId" class="form-label">CVE ID:</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="cveId" 
+                                   name="cveId" 
+                                   placeholder="Enter CVE ID (e.g., CVE-2024-12345)" 
+                                   required 
+                                   pattern=".*" 
+                                   title="Enter a CVE identifier" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-search"></i> Search CVE
+                        </button>
+                        @Html.AntiForgeryToken()
+                    </form>
+
+                    @if (!string.IsNullOrEmpty(ViewBag.SearchMessage))
+                    {
+                        <div class="alert @(ViewBag.SearchMessage.ToString().Contains("No CVE was found") || ViewBag.SearchMessage.ToString().Contains("error") ? "alert-warning" : "alert-info") alert-dismissible fade show" role="alert">
+                            @ViewBag.SearchMessage
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12 text-center">
+            <p class="text-muted">
+                Or <a asp-controller="Cve" asp-action="Index" class="btn btn-outline-primary">Browse All CVE Records</a>
+            </p>
+        </div>
+    </div>
 </div>
