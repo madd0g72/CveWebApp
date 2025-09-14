@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using CveWebApp.Data;
 using CveWebApp.Models;
 
@@ -28,14 +29,49 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     }
 });
 
+// Add Identity services for role-based authentication
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    // Configure password requirements for development/testing
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequiredLength = 4; // Simplified for testing
+    
+    // Configure user requirements
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedEmail = false;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
+// Configure application cookie settings
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.LogoutPath = "/Account/Logout";
+});
+
 var app = builder.Build();
 
-// Seed test data in development mode
+// Seed test data and create admin user in development mode
 if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        
+        // Ensure database is created
+        await context.Database.EnsureCreatedAsync();
+        
+        // Seed roles and admin user
+        await SeedRolesAndUsersAsync(userManager, roleManager);
+        
+        // Seed test CVE data
         await SeedTestDataAsync(context);
     }
 }
@@ -53,6 +89,8 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+// Add authentication and authorization middleware
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
@@ -60,6 +98,64 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+/// <summary>
+/// Seeds application roles and creates default admin user for testing/development
+/// </summary>
+async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+{
+    // Create roles if they don't exist
+    string[] roleNames = { "Admin", "User" };
+    foreach (var roleName in roleNames)
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+    }
+
+    // Create default admin user if it doesn't exist
+    var adminEmail = "admin@cveapp.local";
+    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+    
+    if (adminUser == null)
+    {
+        adminUser = new ApplicationUser
+        {
+            UserName = adminEmail,
+            Email = adminEmail,
+            EmailConfirmed = true,
+            FullName = "System Administrator"
+        };
+        
+        var result = await userManager.CreateAsync(adminUser, "admin123");
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+    }
+
+    // Create default test user if it doesn't exist
+    var userEmail = "user@cveapp.local";
+    var testUser = await userManager.FindByEmailAsync(userEmail);
+    
+    if (testUser == null)
+    {
+        testUser = new ApplicationUser
+        {
+            UserName = userEmail,
+            Email = userEmail,
+            EmailConfirmed = true,
+            FullName = "Test User"
+        };
+        
+        var result = await userManager.CreateAsync(testUser, "user123");
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(testUser, "User");
+        }
+    }
+}
 
 async Task SeedTestDataAsync(ApplicationDbContext context)
 {

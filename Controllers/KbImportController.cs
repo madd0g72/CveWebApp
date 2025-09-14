@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
@@ -6,6 +7,10 @@ using System.Globalization;
 
 namespace CveWebApp.Controllers
 {
+    /// <summary>
+    /// Controller for KB import functionality - restricted to Admin role only
+    /// </summary>
+    [Authorize(Roles = "Admin")]
     public class KbImportController : Controller
     {
         private readonly ApplicationDbContext _context;
