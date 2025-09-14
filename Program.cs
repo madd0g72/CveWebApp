@@ -8,13 +8,24 @@ builder.Services.AddControllersWithViews();
 
 // Configure Entity Framework with MariaDB
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        new MySqlServerVersion(new Version(10, 5, 0)), // MariaDB 10.5+
-        mysqlOptions => mysqlOptions
-            .EnableRetryOnFailure()
-            .CommandTimeout(30)
-    ));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.UseMySql(
+            connectionString,
+            new MySqlServerVersion(new Version(10, 5, 0)), // MariaDB 10.5+
+            mysqlOptions => mysqlOptions
+                .EnableRetryOnFailure()
+                .CommandTimeout(30)
+        );
+    }
+    else
+    {
+        // Use in-memory database for testing/demo when no connection string is available
+        options.UseInMemoryDatabase("TestDatabase");
+    }
+});
 
 var app = builder.Build();
 
