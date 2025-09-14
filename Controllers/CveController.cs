@@ -160,7 +160,7 @@ namespace CveWebApp.Controllers
                         ("KB" + installedKb).Equals(reqKb, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
                 
-                server.IsCompliant = server.MissingKbs.Count == 0 && viewModel.RequiredKbs.Count > 0;
+                server.IsCompliant = viewModel.RequiredKbs.Count == 0 || server.MissingKbs.Count == 0;
             }
 
             viewModel.ServerStatuses = serverGroups.OrderBy(s => s.Computer).ToList();
