@@ -122,8 +122,7 @@ namespace CveWebApp.Controllers
                             {
                                 Computer = computer,
                                 OSProduct = osProduct,
-                                KB = kb,
-                                LastUpdated = DateTime.UtcNow
+                                KB = kb                                
                             });
                         }
                     }

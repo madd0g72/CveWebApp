@@ -22,7 +22,5 @@ namespace CveWebApp.Models
         [Display(Name = "KB")]
         public string KB { get; set; } = string.Empty;
 
-        [Display(Name = "Last Updated")]
-        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
 }
