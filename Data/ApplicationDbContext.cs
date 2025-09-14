@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using CveWebApp.Models;
 
 namespace CveWebApp.Data
 {
-    public class ApplicationDbContext : DbContext
+    /// <summary>
+    /// Application database context with Identity support for role-based authentication
+    /// </summary>
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)

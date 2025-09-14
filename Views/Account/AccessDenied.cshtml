@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "Access Denied";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Access Denied</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning" role="alert">
+                    <h5>Insufficient Permissions</h5>
+                    <p>You do not have the required permissions to access this resource.</p>
+                    <p>The page you tried to access requires <strong>Administrator</strong> privileges.</p>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>What you can do:</h6>
+                    <ul>
+                        <li>Return to the <a asp-controller="Cve" asp-action="Index" class="btn btn-link p-0">CVE Dashboard</a></li>
+                        <li>Go to the <a asp-controller="Home" asp-action="Index" class="btn btn-link p-0">Home page</a></li>
+                        @if (!User.Identity?.IsAuthenticated == true)
+                        {
+                            <li>Try <a asp-controller="Account" asp-action="Login" class="btn btn-link p-0">logging in</a> with an administrator account</li>
+                        }
+                        else if (!User.IsInRole("Admin"))
+                        {
+                            <li>Contact your system administrator for access to admin features</li>
+                        }
+                    </ul>
+                </div>
+                
+                <div class="mt-4">
+                    <a asp-controller="Cve" asp-action="Index" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to CVE Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

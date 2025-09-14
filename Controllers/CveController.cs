@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
@@ -6,6 +7,9 @@ using System.Globalization;
 
 namespace CveWebApp.Controllers
 {
+    /// <summary>
+    /// Controller for CVE data management - viewing is public, import is admin-only
+    /// </summary>
     public class CveController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -220,15 +224,17 @@ namespace CveWebApp.Controllers
             return await query.ToListAsync();
         }
 
-        // GET: Cve/Import
+        // GET: Cve/Import - Admin only
+        [Authorize(Roles = "Admin")]
         public IActionResult Import()
         {
             return View();
         }
 
-        // POST: Cve/Import
+        // POST: Cve/Import - Admin only
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Import(IFormFile csvFile)
         {
             if (csvFile == null || csvFile.Length == 0)
