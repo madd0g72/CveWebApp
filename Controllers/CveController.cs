@@ -350,9 +350,9 @@ namespace CveWebApp.Controllers
             // Just check that we have at least one valid header
             var validHeaders = new[] { "releasedate", "release date", "productfamily", "product family", 
                                      "product", "platform", "impact", "maxseverity", "max severity", 
-                                     "article", "articlelink", "article link", "supercedence", "download", 
-                                     "downloadlink", "download link", "buildnumber", "build number", 
-                                     "details", "cve", "detailslink", "details link", "basescore", "base score", 
+                                     "article", "articlelink", "article link", "article (link)", "supercedence", "download", 
+                                     "downloadlink", "download link", "download (link)", "buildnumber", "build number", 
+                                     "details", "cve", "detailslink", "details link", "details (link)", "basescore", "base score", 
                                      "temporalscore", "temporal score", "customeractionrequired", "customer action required" };
             
             return headers.Any(h => validHeaders.Contains(h.Trim().ToLowerInvariant()));
@@ -401,8 +401,11 @@ namespace CveWebApp.Controllers
                 var header = headers[i].Trim().ToLowerInvariant();
                 var value = values[i].Trim();
 
-                if (string.IsNullOrEmpty(value))
-                    continue;
+                // Handle null/empty values more robustly - convert empty strings to null for nullable fields
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    value = string.Empty; // Normalize to empty string for consistent handling
+                }
 
                 try
                 {
@@ -413,83 +416,112 @@ namespace CveWebApp.Controllers
                             break;
                         case "releasedate":
                         case "release date":
-                            if (DateTime.TryParse(value, out var releaseDate))
+                            if (!string.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, out var releaseDate))
                                 record.ReleaseDate = releaseDate;
+                            else
+                                record.ReleaseDate = null;
                             break;
                         case "productfamily":
                         case "product family":
-                            record.ProductFamily = value;
+                            record.ProductFamily = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "product":
-                            record.Product = value;
+                            record.Product = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "platform":
-                            record.Platform = value;
+                            record.Platform = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "impact":
-                            record.Impact = value;
+                            record.Impact = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "maxseverity":
                         case "max severity":
-                            record.MaxSeverity = value;
+                            record.MaxSeverity = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "article":
-                            record.Article = value;
+                            record.Article = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "articlelink":
                         case "article link":
-                            record.ArticleLink = value;
+                        case "article (link)":
+                            record.ArticleLink = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "supercedence":
-                            record.Supercedence = value;
+                            record.Supercedence = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "download":
-                            record.Download = value;
+                            record.Download = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "downloadlink":
                         case "download link":
-                            record.DownloadLink = value;
+                        case "download (link)":
+                            record.DownloadLink = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "buildnumber":
                         case "build number":
-                            record.BuildNumber = value;
+                            record.BuildNumber = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "details":
                         case "cve":
-                            record.Details = value;
+                            record.Details = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "detailslink":
                         case "details link":
-                            record.DetailsLink = value;
+                        case "details (link)":
+                            record.DetailsLink = string.IsNullOrWhiteSpace(value) ? null : value;
                             break;
                         case "basescore":
                         case "base score":
-                            if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var baseScore))
+                            if (!string.IsNullOrWhiteSpace(value) && 
+                                decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var baseScore))
                             {
                                 if (baseScore >= 0.0m && baseScore <= 10.0m)
                                     record.BaseScore = baseScore;
-                                // Note: Invalid range values are silently ignored to allow data import to continue
+                                else
+                                    record.BaseScore = null; // Invalid range values
                             }
-                            // Note: Invalid format values are silently ignored to allow data import to continue
+                            else
+                            {
+                                record.BaseScore = null; // Invalid format or empty values
+                            }
                             break;
                         case "temporalscore":
                         case "temporal score":
-                            if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var temporalScore))
+                            if (!string.IsNullOrWhiteSpace(value) && 
+                                decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var temporalScore))
                             {
                                 if (temporalScore >= 0.0m && temporalScore <= 10.0m)
                                     record.TemporalScore = temporalScore;
-                                // Note: Invalid range values are silently ignored to allow data import to continue
+                                else
+                                    record.TemporalScore = null; // Invalid range values
                             }
-                            // Note: Invalid format values are silently ignored to allow data import to continue
+                            else
+                            {
+                                record.TemporalScore = null; // Invalid format or empty values
+                            }
                             break;
                         case "customeractionrequired":
                         case "customer action required":
-                            if (bool.TryParse(value, out var actionRequired))
+                            if (string.IsNullOrWhiteSpace(value))
+                            {
+                                record.CustomerActionRequired = null;
+                            }
+                            else if (bool.TryParse(value, out var actionRequired))
+                            {
                                 record.CustomerActionRequired = actionRequired;
+                            }
                             else if (value.ToLowerInvariant() == "yes" || value == "1")
+                            {
                                 record.CustomerActionRequired = true;
+                            }
                             else if (value.ToLowerInvariant() == "no" || value == "0")
+                            {
                                 record.CustomerActionRequired = false;
+                            }
+                            else
+                            {
+                                record.CustomerActionRequired = null; // Invalid value
+                            }
                             break;
                     }
                 }
