@@ -37,14 +37,15 @@ public class HomeController : Controller
 
         try
         {
-            // Search for CVE in the Details column
-            var cveRecord = await _context.CveUpdateStagings
-                .FirstOrDefaultAsync(c => c.Details != null && c.Details.Contains(cleanCveId));
+            // Search for ALL CVE records in the Details column
+            var cveRecords = await _context.CveUpdateStagings
+                .Where(c => c.Details != null && c.Details.Contains(cleanCveId))
+                .ToListAsync();
 
-            if (cveRecord != null)
+            if (cveRecords.Any())
             {
-                // Redirect to the details page for the found record
-                return RedirectToAction("Details", "Cve", new { id = cveRecord.Id });
+                // Redirect to the search results page showing all affected products
+                return RedirectToAction("SearchResults", new { cveId = cleanCveId });
             }
             else
             {
@@ -59,6 +60,73 @@ public class HomeController : Controller
             var errorMessage = "An error occurred while searching. Please try again.";
             return RedirectToAction("Index", new { searchMessage = errorMessage });
         }
+    }
+
+    public async Task<IActionResult> SearchResults(string cveId)
+    {
+        if (string.IsNullOrWhiteSpace(cveId))
+        {
+            return RedirectToAction("Index", new { searchMessage = "Please enter a CVE ID to search." });
+        }
+
+        try
+        {
+            // Search for ALL CVE records that contain this CVE ID in the Details column
+            var cveRecords = await _context.CveUpdateStagings
+                .Where(c => c.Details != null && c.Details.Contains(cveId))
+                .OrderByDescending(c => c.ReleaseDate)
+                .ToListAsync();
+
+            if (!cveRecords.Any())
+            {
+                var notFoundMessage = $"No CVE was found with ID '{cveId}'. Please check the CVE ID and try again.";
+                return RedirectToAction("Index", new { searchMessage = notFoundMessage });
+            }
+
+            ViewBag.SearchedCveId = cveId;
+            ViewBag.CveDetails = ExtractCveDetails(cveRecords, cveId);
+            
+            return View(cveRecords);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving search results for CVE ID: {CveId}", cveId);
+            var errorMessage = "An error occurred while retrieving search results. Please try again.";
+            return RedirectToAction("Index", new { searchMessage = errorMessage });
+        }
+    }
+
+    private dynamic ExtractCveDetails(List<CveUpdateStaging> records, string cveId)
+    {
+        // Extract common CVE information from the first record
+        var firstRecord = records.First();
+        
+        return new
+        {
+            CveId = cveId,
+            FirstDiscovered = records.Min(r => r.ReleaseDate),
+            MaxSeverity = GetHighestSeverity(records),
+            TotalAffectedProducts = records.Count,
+            ProductFamilies = records.Select(r => r.ProductFamily).Distinct().Where(pf => !string.IsNullOrEmpty(pf)).ToList()
+        };
+    }
+
+    private string GetHighestSeverity(List<CveUpdateStaging> records)
+    {
+        var severities = records.Select(r => r.MaxSeverity).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        
+        // Define severity order (highest to lowest)
+        var severityOrder = new[] { "Critical", "High", "Medium", "Low" };
+        
+        foreach (var severity in severityOrder)
+        {
+            if (severities.Any(s => s.Equals(severity, StringComparison.OrdinalIgnoreCase)))
+            {
+                return severity;
+            }
+        }
+        
+        return severities.FirstOrDefault() ?? "Unknown";
     }
 
     public IActionResult Privacy()
