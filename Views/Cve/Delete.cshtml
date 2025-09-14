@@ -1,0 +1,68 @@
+@model CveWebApp.Models.CveUpdateStaging
+
+@{
+    ViewData["Title"] = "Delete CVE Entry";
+}
+
+<h1>Delete CVE Entry</h1>
+
+<h3>Are you sure you want to delete this CVE entry?</h3>
+<div>
+    <hr />
+    <dl class="row">
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.ReleaseDate)</dt>
+        <dd class="col-sm-9">@Html.DisplayFor(model => model.ReleaseDate)</dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.ProductFamily)</dt>
+        <dd class="col-sm-9">@Html.DisplayFor(model => model.ProductFamily)</dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.Product)</dt>
+        <dd class="col-sm-9">@Html.DisplayFor(model => model.Product)</dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.Platform)</dt>
+        <dd class="col-sm-9">@Html.DisplayFor(model => model.Platform)</dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.MaxSeverity)</dt>
+        <dd class="col-sm-9">
+            @if (!string.IsNullOrEmpty(Model.MaxSeverity))
+            {
+                <span class="badge bg-@(GetSeverityClass(Model.MaxSeverity)) fs-6">
+                    @Html.DisplayFor(model => model.MaxSeverity)
+                </span>
+            }
+        </dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.BaseScore)</dt>
+        <dd class="col-sm-9">@Html.DisplayFor(model => model.BaseScore)</dd>
+
+        <dt class="col-sm-3">@Html.DisplayNameFor(model => model.CustomerActionRequired)</dt>
+        <dd class="col-sm-9">
+            @if (Model.CustomerActionRequired.HasValue)
+            {
+                <span class="badge bg-@(Model.CustomerActionRequired.Value ? "warning" : "success") fs-6">
+                    @(Model.CustomerActionRequired.Value ? "Required" : "Not Required")
+                </span>
+            }
+        </dd>
+    </dl>
+
+    <form asp-action="Delete">
+        <input type="hidden" asp-for="Id" />
+        <input type="submit" value="Delete" class="btn btn-danger" />
+        <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@functions {
+    string GetSeverityClass(string severity)
+    {
+        return severity?.ToLower() switch
+        {
+            "critical" => "danger",
+            "high" => "warning",
+            "medium" => "primary",
+            "low" => "secondary",
+            _ => "dark"
+        };
+    }
+}

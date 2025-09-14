@@ -1,0 +1,173 @@
+@model CveWebApp.Models.CveUpdateStaging
+
+@{
+    ViewData["Title"] = "Edit CVE Entry";
+}
+
+<h1>Edit CVE Entry</h1>
+
+<hr />
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="ReleaseDate" class="form-label"></label>
+                        <input asp-for="ReleaseDate" class="form-control" type="date" />
+                        <span asp-validation-for="ReleaseDate" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="MaxSeverity" class="form-label"></label>
+                        <select asp-for="MaxSeverity" class="form-select">
+                            <option value="">Select Severity</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                        <span asp-validation-for="MaxSeverity" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="ProductFamily" class="form-label"></label>
+                        <input asp-for="ProductFamily" class="form-control" />
+                        <span asp-validation-for="ProductFamily" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product" class="form-label"></label>
+                        <input asp-for="Product" class="form-control" />
+                        <span asp-validation-for="Product" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Platform" class="form-label"></label>
+                        <input asp-for="Platform" class="form-control" />
+                        <span asp-validation-for="Platform" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Impact" class="form-label"></label>
+                        <input asp-for="Impact" class="form-control" />
+                        <span asp-validation-for="Impact" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Article" class="form-label"></label>
+                        <input asp-for="Article" class="form-control" />
+                        <span asp-validation-for="Article" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="ArticleLink" class="form-label"></label>
+                        <input asp-for="ArticleLink" class="form-control" type="url" />
+                        <span asp-validation-for="ArticleLink" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Download" class="form-label"></label>
+                        <input asp-for="Download" class="form-control" />
+                        <span asp-validation-for="Download" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="DownloadLink" class="form-label"></label>
+                        <input asp-for="DownloadLink" class="form-control" type="url" />
+                        <span asp-validation-for="DownloadLink" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="BuildNumber" class="form-label"></label>
+                        <input asp-for="BuildNumber" class="form-control" />
+                        <span asp-validation-for="BuildNumber" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Supercedence" class="form-label"></label>
+                        <input asp-for="Supercedence" class="form-control" />
+                        <span asp-validation-for="Supercedence" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Details" class="form-label"></label>
+                <textarea asp-for="Details" class="form-control" rows="3"></textarea>
+                <span asp-validation-for="Details" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="DetailsLink" class="form-label"></label>
+                <input asp-for="DetailsLink" class="form-control" type="url" />
+                <span asp-validation-for="DetailsLink" class="text-danger"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group mb-3">
+                        <label asp-for="BaseScore" class="form-label"></label>
+                        <input asp-for="BaseScore" class="form-control" type="number" step="0.1" min="0" max="10" />
+                        <span asp-validation-for="BaseScore" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-3">
+                        <label asp-for="TemporalScore" class="form-label"></label>
+                        <input asp-for="TemporalScore" class="form-control" type="number" step="0.1" min="0" max="10" />
+                        <span asp-validation-for="TemporalScore" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" asp-for="CustomerActionRequired" type="checkbox" />
+                            <label class="form-check-label" asp-for="CustomerActionRequired">
+                                Customer Action Required
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+                <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
