@@ -68,7 +68,7 @@ namespace CveWebApp.Controllers
             if (string.IsNullOrWhiteSpace(headerLine))
                 throw new InvalidOperationException("CSV file is empty.");
 
-            var headers = headerLine.Split(',').Select(h => h.Trim()).ToArray();
+            var headers = headerLine.Split(',').Select(h => NormalizeHeaderName(h)).ToArray();
             if (headers.Length < 3 || !headers[0].Equals("Computer", StringComparison.OrdinalIgnoreCase) ||
                 !headers[1].Equals("OSProduct", StringComparison.OrdinalIgnoreCase) ||
                 !headers[2].Equals("InstalledKBs", StringComparison.OrdinalIgnoreCase))
@@ -206,6 +206,29 @@ namespace CveWebApp.Controllers
             columns.Add(current.ToString());
 
             return columns.ToArray();
+        }
+
+        /// <summary>
+        /// Normalizes header names by removing quotes and trimming whitespace
+        /// </summary>
+        /// <param name="header">The raw header value</param>
+        /// <returns>Normalized header name</returns>
+        private static string NormalizeHeaderName(string header)
+        {
+            if (string.IsNullOrWhiteSpace(header))
+                return string.Empty;
+
+            // Trim whitespace first
+            var trimmed = header.Trim();
+            
+            // Remove surrounding quotes if present
+            if (trimmed.Length >= 2 && trimmed.StartsWith('"') && trimmed.EndsWith('"'))
+            {
+                trimmed = trimmed.Substring(1, trimmed.Length - 2);
+            }
+            
+            // Trim again in case there was whitespace inside quotes
+            return trimmed.Trim();
         }
     }
 
