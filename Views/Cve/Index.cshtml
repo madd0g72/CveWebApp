@@ -1,14 +1,70 @@
 @model IEnumerable<CveWebApp.Models.CveUpdateStaging>
 
 @{
-    ViewData["Title"] = "CVE Dashboard";
+    ViewData["Title"] = "CVE List";
 }
+
+<h1>CVE List</h1>
+
+<form method="get" asp-action="Index" class="form-inline mb-3">
+    <select name="productFamily" class="form-control mr-2" onchange="this.form.submit()">
+        <option value="">All Families</option>
+        @foreach (var pf in ViewBag.ProductFamilies as List<string>)
+        {
+            if ((string)ViewBag.SelectedProductFamily == pf)
+            {
+                <option value="@pf" selected="selected">@pf</option>
+            }
+            else
+            {
+                <option value="@pf">@pf</option>
+            }
+        }
+    </select>
+    <select name="product" class="form-control mr-2" onchange="this.form.submit()">
+        <option value="">All Products</option>
+        @foreach (var p in ViewBag.Products as List<string>)
+        {
+            if ((string)ViewBag.SelectedProduct == p)
+            {
+                <option value="@p" selected="selected">@p</option>
+            }
+            else
+            {
+                <option value="@p">@p</option>
+            }
+        }
+    </select>
+    <select name="maxSeverity" class="form-control mr-2" onchange="this.form.submit()">
+        <option value="">All Severities</option>
+        @foreach (var s in ViewBag.MaxSeverities as List<string>)
+        {
+            if ((string)ViewBag.SelectedMaxSeverity == s)
+            {
+                <option value="@s" selected="selected">@s</option>
+            }
+            else
+            {
+                <option value="@s">@s</option>
+            }
+        }
+    </select>
+    <input type="text" name="article" class="form-control mr-2" placeholder="Article contains..." value="@ViewBag.ArticleQuery" />
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="@Url.Action("Index")" class="btn btn-secondary ml-2">Reset</a>
+</form>
 
 <div style="margin-bottom: 1em;">
     <nav aria-label="Page navigation">
         <ul class="pagination justify-content-start">
             <li class="page-item @(ViewBag.CurrentPage <= 1 ? "disabled" : "")">
-                <a class="page-link" href="@Url.Action("Index", new { page = ViewBag.CurrentPage - 1 })" tabindex="-1">Previous</a>
+                <a class="page-link" href="@Url.Action("Index", new {
+                    page = ViewBag.CurrentPage - 1,
+                    productFamily = ViewBag.SelectedProductFamily,
+                    product = ViewBag.SelectedProduct,
+                    maxSeverity = ViewBag.SelectedMaxSeverity,
+                    article = ViewBag.ArticleQuery
+                })" tabindex="-1">Previous</a>
             </li>
             <li class="page-item disabled">
                 <span class="page-link">
@@ -16,101 +72,74 @@
                 </span>
             </li>
             <li class="page-item @(ViewBag.CurrentPage >= ViewBag.TotalPages ? "disabled" : "")">
-                <a class="page-link" href="@Url.Action("Index", new { page = ViewBag.CurrentPage + 1 })">Next</a>
+                <a class="page-link" href="@Url.Action("Index", new {
+                    page = ViewBag.CurrentPage + 1,
+                    productFamily = ViewBag.SelectedProductFamily,
+                    product = ViewBag.SelectedProduct,
+                    maxSeverity = ViewBag.SelectedMaxSeverity,
+                    article = ViewBag.ArticleQuery
+                })">Next</a>
             </li>
         </ul>
     </nav>
 </div>
 
-<div class="row">
-    <div class="col-md-12">
-        <h1>CVE Dashboard</h1>
-        <p>
-            <a asp-action="Create" class="btn btn-primary">Add New CVE Entry</a>
-        </p>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>@Html.DisplayNameFor(model => model.ReleaseDate)</th>
-                        <th>@Html.DisplayNameFor(model => model.ProductFamily)</th>
-                        <th>@Html.DisplayNameFor(model => model.Product)</th>
-                        <th>@Html.DisplayNameFor(model => model.Platform)</th>
-                        <th>@Html.DisplayNameFor(model => model.MaxSeverity)</th>
-                        <th>@Html.DisplayNameFor(model => model.BaseScore)</th>
-                        <th>@Html.DisplayNameFor(model => model.CustomerActionRequired)</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Model)
-                    {
-                        <tr>
-                            <td>@Html.DisplayFor(modelItem => item.ReleaseDate)</td>
-                            <td>@Html.DisplayFor(modelItem => item.ProductFamily)</td>
-                            <td>@Html.DisplayFor(modelItem => item.Product)</td>
-                            <td>@Html.DisplayFor(modelItem => item.Platform)</td>
-                            <td>
-                                @if (!string.IsNullOrEmpty(item.MaxSeverity))
-                                {
-                                    <span class="badge bg-@(GetSeverityClass(item.MaxSeverity))">
-                                        @Html.DisplayFor(modelItem => item.MaxSeverity)
-                                    </span>
-                                }
-                            </td>
-                            <td>@Html.DisplayFor(modelItem => item.BaseScore)</td>
-                            <td>
-                                @if (item.CustomerActionRequired.HasValue)
-                                {
-                                    <span class="badge bg-@(item.CustomerActionRequired.Value ? "warning" : "success")">
-                                        @(item.CustomerActionRequired.Value ? "Required" : "Not Required")
-                                    </span>
-                                }
-                            </td>
-                            <td>
-                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-outline-info">Details</a>
-                                <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-outline-danger">Delete</a>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-@if (!Model.Any())
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.First().ReleaseDate)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().ProductFamily)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().Product)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().MaxSeverity)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().Article)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().BaseScore)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.First().Details) @* CVE column *@
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model)
 {
-    <div class="row">
-        <div class="col-md-12">
-            <div class="alert alert-info" role="alert">
-                <h4 class="alert-heading">No CVE entries found</h4>
-                <p>There are currently no CVE entries in the database.</p>
-                <hr>
-                <p class="mb-0">
-                    <a asp-action="Create" class="btn btn-primary">Add the first CVE entry</a>
-                </p>
-            </div>
-        </div>
-    </div>
+    <tr>
+        <td>
+            @item.ReleaseDate?.ToString("yyyy-MM-dd")
+        </td>
+        <td>
+            @item.ProductFamily
+        </td>
+        <td>
+            @item.Product
+        </td>
+        <td>
+            @item.MaxSeverity
+        </td>
+        <td>
+            @item.Article
+        </td>
+        <td>
+            @item.BaseScore
+        </td>
+        <td>
+            @item.Details
+        </td>
+        <td>
+            <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm">Details</a>
+        </td>
+    </tr>
 }
-
-@functions {
-    string GetSeverityClass(string severity)
-    {
-        return severity?.ToLower() switch
-        {
-            "critical" => "danger",
-            "high" => "warning",
-            "medium" => "primary",
-            "low" => "secondary",
-            _ => "dark"
-        };
-    }
-}
+    </tbody>
+</table>

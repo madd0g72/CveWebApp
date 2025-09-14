@@ -1,59 +1,62 @@
+using System;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CveWebApp.Models
 {
-    [Table("Staging")]
     public class CveUpdateStaging
     {
         [Key]
         public int Id { get; set; }
 
+        [Display(Name = "Release Date")]
         public DateTime? ReleaseDate { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Product Family")]
         public string? ProductFamily { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Product")]
         public string? Product { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Platform")]
         public string? Platform { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Impact")]
         public string? Impact { get; set; }
 
-        [StringLength(100)]
+        [Display(Name = "Max Severity")]
         public string? MaxSeverity { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Article")]
         public string? Article { get; set; }
 
-        [StringLength(500)]
+        [Display(Name = "Article Link")]
         public string? ArticleLink { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Supercedence")]
         public string? Supercedence { get; set; }
 
-        [StringLength(255)]
+        [Display(Name = "Download")]
         public string? Download { get; set; }
 
-        [StringLength(500)]
+        [Display(Name = "Download Link")]
         public string? DownloadLink { get; set; }
 
-        [StringLength(100)]
+        [Display(Name = "Build Number")]
         public string? BuildNumber { get; set; }
 
-        [StringLength(1000)]
-        public string? Details { get; set; }
+        [Display(Name = "CVE")]
+        public string? Details { get; set; } // This is your CVE identifier
 
-        [StringLength(500)]
+        [Display(Name = "Details Link")]
         public string? DetailsLink { get; set; }
 
-        public decimal? BaseScore { get; set; }
+        [Display(Name = "Base Score")]
+        public decimal? BaseScore { get; set; } // decimal for scores like 8.3, 5.1
 
-        public decimal? TemporalScore { get; set; }
+        [Display(Name = "Temporal Score")]
+        public decimal? TemporalScore { get; set; } // decimal for scores like 8.3, 5.1
 
+        [Display(Name = "Customer Action Required")]
         public bool? CustomerActionRequired { get; set; }
     }
 }

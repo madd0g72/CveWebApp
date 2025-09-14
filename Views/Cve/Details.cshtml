@@ -7,134 +7,75 @@
 <h1>CVE Details</h1>
 
 <div>
-    <hr />
-    <div class="row">
-        <div class="col-md-8">
-            <dl class="row">
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.ReleaseDate)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.ReleaseDate)</dd>
+    <dl class="row">
+        <dt class="col-sm-2">Release Date</dt>
+        <dd class="col-sm-10">@Model.ReleaseDate?.ToString("yyyy-MM-dd")</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.ProductFamily)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.ProductFamily)</dd>
+        <dt class="col-sm-2">Product Family</dt>
+        <dd class="col-sm-10">@Model.ProductFamily</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Product)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Product)</dd>
+        <dt class="col-sm-2">Product</dt>
+        <dd class="col-sm-10">@Model.Product</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Platform)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Platform)</dd>
+        <dt class="col-sm-2">Platform</dt>
+        <dd class="col-sm-10">@Model.Platform</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Impact)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Impact)</dd>
+        <dt class="col-sm-2">Impact</dt>
+        <dd class="col-sm-10">@Model.Impact</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.MaxSeverity)</dt>
-                <dd class="col-sm-8">
-                    @if (!string.IsNullOrEmpty(Model.MaxSeverity))
-                    {
-                        <span class="badge bg-@(GetSeverityClass(Model.MaxSeverity)) fs-6">
-                            @Html.DisplayFor(model => model.MaxSeverity)
-                        </span>
-                    }
-                </dd>
+        <dt class="col-sm-2">Max Severity</dt>
+        <dd class="col-sm-10">@Model.MaxSeverity</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Article)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Article)</dd>
+        <dt class="col-sm-2">Article</dt>
+        <dd class="col-sm-10">@Model.Article</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.ArticleLink)</dt>
-                <dd class="col-sm-8">
-                    @if (!string.IsNullOrEmpty(Model.ArticleLink))
-                    {
-                        <a href="@Model.ArticleLink" target="_blank" class="btn btn-outline-primary btn-sm">View Article</a>
-                    }
-                </dd>
+        <dt class="col-sm-2">Article Link</dt>
+        <dd class="col-sm-10">
+            @if (!string.IsNullOrEmpty(Model.ArticleLink))
+            {
+                <a href="@Model.ArticleLink" target="_blank">@Model.ArticleLink</a>
+            }
+        </dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Supercedence)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Supercedence)</dd>
+        <dt class="col-sm-2">Supercedence</dt>
+        <dd class="col-sm-10">@Model.Supercedence</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Download)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Download)</dd>
+        <dt class="col-sm-2">Download</dt>
+        <dd class="col-sm-10">@Model.Download</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.DownloadLink)</dt>
-                <dd class="col-sm-8">
-                    @if (!string.IsNullOrEmpty(Model.DownloadLink))
-                    {
-                        <a href="@Model.DownloadLink" target="_blank" class="btn btn-outline-success btn-sm">Download</a>
-                    }
-                </dd>
+        <dt class="col-sm-2">Download Link</dt>
+        <dd class="col-sm-10">
+            @if (!string.IsNullOrEmpty(Model.DownloadLink))
+            {
+                <a href="@Model.DownloadLink" target="_blank">@Model.DownloadLink</a>
+            }
+        </dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.BuildNumber)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.BuildNumber)</dd>
+        <dt class="col-sm-2">Build Number</dt>
+        <dd class="col-sm-10">@Model.BuildNumber</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.Details)</dt>
-                <dd class="col-sm-8">@Html.DisplayFor(model => model.Details)</dd>
+        <dt class="col-sm-2">Details</dt>
+        <dd class="col-sm-10">@Model.Details</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.DetailsLink)</dt>
-                <dd class="col-sm-8">
-                    @if (!string.IsNullOrEmpty(Model.DetailsLink))
-                    {
-                        <a href="@Model.DetailsLink" target="_blank" class="btn btn-outline-info btn-sm">View Details</a>
-                    }
-                </dd>
+        <dt class="col-sm-2">Details Link</dt>
+        <dd class="col-sm-10">
+            @if (!string.IsNullOrEmpty(Model.DetailsLink))
+            {
+                <a href="@Model.DetailsLink" target="_blank">@Model.DetailsLink</a>
+            }
+        </dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.BaseScore)</dt>
-                <dd class="col-sm-8">
-                    @if (Model.BaseScore.HasValue)
-                    {
-                        <span class="badge bg-@(GetScoreClass(Model.BaseScore.Value)) fs-6">
-                            @Html.DisplayFor(model => model.BaseScore)
-                        </span>
-                    }
-                </dd>
+        <dt class="col-sm-2">Base Score</dt>
+        <dd class="col-sm-10">@Model.BaseScore</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.TemporalScore)</dt>
-                <dd class="col-sm-8">
-                    @if (Model.TemporalScore.HasValue)
-                    {
-                        <span class="badge bg-@(GetScoreClass(Model.TemporalScore.Value)) fs-6">
-                            @Html.DisplayFor(model => model.TemporalScore)
-                        </span>
-                    }
-                </dd>
+        <dt class="col-sm-2">Temporal Score</dt>
+        <dd class="col-sm-10">@Model.TemporalScore</dd>
 
-                <dt class="col-sm-4">@Html.DisplayNameFor(model => model.CustomerActionRequired)</dt>
-                <dd class="col-sm-8">
-                    @if (Model.CustomerActionRequired.HasValue)
-                    {
-                        <span class="badge bg-@(Model.CustomerActionRequired.Value ? "warning" : "success") fs-6">
-                            @(Model.CustomerActionRequired.Value ? "Required" : "Not Required")
-                        </span>
-                    }
-                </dd>
-            </dl>
-        </div>
-    </div>
+        <dt class="col-sm-2">Customer Action Required</dt>
+        <dd class="col-sm-10">@Model.CustomerActionRequired</dd>
+    </dl>
 </div>
 
 <div>
-    <a asp-action="Edit" asp-route-id="@Model?.Id" class="btn btn-primary">Edit</a>
     <a asp-action="Index" class="btn btn-secondary">Back to List</a>
 </div>
-
-@functions {
-    string GetSeverityClass(string severity)
-    {
-        return severity?.ToLower() switch
-        {
-            "critical" => "danger",
-            "high" => "warning",
-            "medium" => "primary",
-            "low" => "secondary",
-            _ => "dark"
-        };
-    }
-
-    string GetScoreClass(decimal score)
-    {
-        return score switch
-        {
-            >= 9.0m => "danger",
-            >= 7.0m => "warning",
-            >= 4.0m => "primary",
-            _ => "secondary"
-        };
-    }
-}
