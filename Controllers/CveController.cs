@@ -259,7 +259,6 @@ namespace CveWebApp.Controllers
             try
             {
                 var importedCount = 0;
-                var updatedCount = 0;
                 var errors = new List<string>();
                 var warnings = new List<string>();
 
@@ -281,7 +280,7 @@ namespace CveWebApp.Controllers
                             // Validate that we have essential headers
                             if (!HasRequiredHeaders(headers))
                             {
-                                ModelState.AddModelError("", "CSV file must contain at least 'Id' header. Please check the format requirements.");
+                                ModelState.AddModelError("", "CSV file must contain at least one valid CVE data column. Please check the format requirements.");
                                 return View();
                             }
                             continue;
@@ -297,29 +296,11 @@ namespace CveWebApp.Controllers
                             
                             if (cveRecord != null)
                             {
-                                // Validate that Id is provided and positive
-                                if (cveRecord.Id <= 0)
-                                {
-                                    errors.Add($"Line {lineNumber}: Id must be a positive integer");
-                                    continue;
-                                }
-
-                                // Check if record exists by Id
-                                var existingRecord = await _context.CveUpdateStagings
-                                    .FirstOrDefaultAsync(c => c.Id == cveRecord.Id);
-
-                                if (existingRecord != null)
-                                {
-                                    // Update existing record
-                                    UpdateExistingRecord(existingRecord, cveRecord);
-                                    updatedCount++;
-                                }
-                                else
-                                {
-                                    // Add new record
-                                    _context.CveUpdateStagings.Add(cveRecord);
-                                    importedCount++;
-                                }
+                                // Since we no longer require Id in CSV, we'll identify duplicates by other fields
+                                // For simplicity, we'll treat all records as new since Id is auto-generated
+                                // In a production scenario, you might want to check for duplicates using other fields
+                                _context.CveUpdateStagings.Add(cveRecord);
+                                importedCount++;
                             }
                         }
                         catch (Exception ex)
@@ -330,10 +311,10 @@ namespace CveWebApp.Controllers
                 }
 
                 // Save changes if we have records to process and not too many errors
-                if ((importedCount > 0 || updatedCount > 0) && errors.Count < 10)
+                if (importedCount > 0 && errors.Count < 10)
                 {
                     await _context.SaveChangesAsync();
-                    ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}, Updated records: {updatedCount}";
+                    ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}";
                     
                     if (errors.Count > 0)
                     {
@@ -346,7 +327,7 @@ namespace CveWebApp.Controllers
                     ViewBag.ErrorMessage = $"Import failed: Too many errors ({errors.Count}). Please check your CSV file format and fix the issues.";
                     ViewBag.Errors = errors.Take(10).ToList(); // Show first 10 errors
                 }
-                else if (importedCount == 0 && updatedCount == 0)
+                else if (importedCount == 0)
                 {
                     ViewBag.ErrorMessage = "No valid records found to import. Please check your CSV file format.";
                     if (errors.Count > 0)
@@ -365,7 +346,16 @@ namespace CveWebApp.Controllers
 
         private bool HasRequiredHeaders(string[] headers)
         {
-            return headers.Any(h => h.Trim().ToLowerInvariant() == "id");
+            // No longer require 'Id' column - the database will auto-generate it
+            // Just check that we have at least one valid header
+            var validHeaders = new[] { "releasedate", "release date", "productfamily", "product family", 
+                                     "product", "platform", "impact", "maxseverity", "max severity", 
+                                     "article", "articlelink", "article link", "supercedence", "download", 
+                                     "downloadlink", "download link", "buildnumber", "build number", 
+                                     "details", "cve", "detailslink", "details link", "basescore", "base score", 
+                                     "temporalscore", "temporal score", "customeractionrequired", "customer action required" };
+            
+            return headers.Any(h => validHeaders.Contains(h.Trim().ToLowerInvariant()));
         }
 
         private string[] ParseCsvLine(string line)
@@ -419,7 +409,7 @@ namespace CveWebApp.Controllers
                     switch (header)
                     {
                         case "id":
-                            record.Id = int.Parse(value);
+                            // Skip Id field - let the database auto-generate it
                             break;
                         case "releasedate":
                         case "release date":
@@ -502,25 +492,5 @@ namespace CveWebApp.Controllers
             return record;
         }
 
-        private void UpdateExistingRecord(CveUpdateStaging existing, CveUpdateStaging updated)
-        {
-            existing.ReleaseDate = updated.ReleaseDate ?? existing.ReleaseDate;
-            existing.ProductFamily = updated.ProductFamily ?? existing.ProductFamily;
-            existing.Product = updated.Product ?? existing.Product;
-            existing.Platform = updated.Platform ?? existing.Platform;
-            existing.Impact = updated.Impact ?? existing.Impact;
-            existing.MaxSeverity = updated.MaxSeverity ?? existing.MaxSeverity;
-            existing.Article = updated.Article ?? existing.Article;
-            existing.ArticleLink = updated.ArticleLink ?? existing.ArticleLink;
-            existing.Supercedence = updated.Supercedence ?? existing.Supercedence;
-            existing.Download = updated.Download ?? existing.Download;
-            existing.DownloadLink = updated.DownloadLink ?? existing.DownloadLink;
-            existing.BuildNumber = updated.BuildNumber ?? existing.BuildNumber;
-            existing.Details = updated.Details ?? existing.Details;
-            existing.DetailsLink = updated.DetailsLink ?? existing.DetailsLink;
-            existing.BaseScore = updated.BaseScore ?? existing.BaseScore;
-            existing.TemporalScore = updated.TemporalScore ?? existing.TemporalScore;
-            existing.CustomerActionRequired = updated.CustomerActionRequired ?? existing.CustomerActionRequired;
-        }
     }
 }
