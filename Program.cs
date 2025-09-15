@@ -8,8 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Choose database provider based on configuration
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "MariaDb"; // Default to MariaDb for compatibility
+// Detect provider from config
+var dbProvider = builder.Configuration["DatabaseProvider"] ?? "MariaDb";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -20,15 +20,16 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseMySql(
                 connectionString,
-                new MySqlServerVersion(new Version(10, 5, 0)), // MariaDB 10.5+
-                mysqlOptions => mysqlOptions
-                    .EnableRetryOnFailure()
-                    .CommandTimeout(30)
+                new MySqlServerVersion(new Version(10, 5, 0)),
+                mysqlOptions => mysqlOptions.EnableRetryOnFailure().CommandTimeout(30)
             );
         }
         else if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
         {
-            options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure());
+            options.UseSqlServer(
+                connectionString,
+                sqlOptions => sqlOptions.EnableRetryOnFailure()
+            );
         }
         else
         {
@@ -37,29 +38,25 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     }
     else
     {
-        // Use in-memory database for testing/demo when no connection string is available
+        // Use in-memory DB for testing/demo if no connection string is given
         options.UseInMemoryDatabase("TestDatabase");
     }
 });
 
-// Add Identity services for role-based authentication
+// Add Identity services
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    // Configure password requirements for development/testing
     options.Password.RequireDigit = false;
     options.Password.RequireLowercase = false;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 4; // Simplified for testing
-
-    // Configure user requirements
+    options.Password.RequiredLength = 4;
     options.User.RequireUniqueEmail = true;
     options.SignIn.RequireConfirmedEmail = false;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Configure application cookie settings
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
@@ -69,22 +66,20 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 var app = builder.Build();
 
-// Seed test data and create admin user in development mode
-if (app.Environment.IsDevelopment())
+// ----- Database migration and seeding -----
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    // This will create the database and apply any pending migrations
+    await context.Database.MigrateAsync();
+
+    if (app.Environment.IsDevelopment())
     {
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-        // Ensure database is created
-        await context.Database.EnsureCreatedAsync();
-
-        // Seed roles and admin user
         await SeedRolesAndUsersAsync(userManager, roleManager);
-
-        // Seed test CVE data
         await SeedTestDataAsync(context);
     }
 }
@@ -93,7 +88,6 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -102,7 +96,6 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -117,7 +110,6 @@ app.Run();
 /// </summary>
 async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
 {
-    // Create roles if they don't exist
     string[] roleNames = { "Admin", "User", "operator" };
     foreach (var roleName in roleNames)
     {
@@ -127,7 +119,6 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
         }
     }
 
-    // Create default admin user if it doesn't exist
     var adminEmail = "admin@cveapp.local";
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
@@ -148,7 +139,6 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
         }
     }
 
-    // Create default test user if it doesn't exist
     var userEmail = "user@cveapp.local";
     var testUser = await userManager.FindByEmailAsync(userEmail);
 
@@ -172,11 +162,8 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
 
 async Task SeedTestDataAsync(ApplicationDbContext context)
 {
-    // Check if we already have data
     if (await context.CveUpdateStagings.AnyAsync())
-    {
-        return; // Data already seeded
-    }
+        return;
 
     var testCveRecords = new List<CveUpdateStaging>
     {
