@@ -2,6 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using CveWebApp.Data;
 using CveWebApp.Models;
+using QuestPDF.Infrastructure;
+
+// Configure QuestPDF license
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,8 +75,17 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    // This will create the database and apply any pending migrations
-    await context.Database.MigrateAsync();
+    // Only run migrations if using a relational database provider
+    if (!context.Database.IsInMemory())
+    {
+        // This will create the database and apply any pending migrations
+        await context.Database.MigrateAsync();
+    }
+    else
+    {
+        // For in-memory database, just ensure it's created
+        await context.Database.EnsureCreatedAsync();
+    }
 
     if (app.Environment.IsDevelopment())
     {

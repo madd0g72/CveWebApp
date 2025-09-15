@@ -33,9 +33,13 @@
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Login</button>
                     </div>
+                    
+                    <div class="text-center mt-3">
+                        <a asp-action="ForgotPassword" class="text-decoration-none">Forgot Password?</a>
+                    </div>
                 </form>
                 
-                @* Development/Testing credentials info *@
+                @* Development/Testing credentials info - Commented out for production
                 <div class="mt-4 p-3 bg-light rounded">
                     <h6>Demo Credentials</h6>
                     <small class="text-muted">
@@ -43,6 +47,7 @@
                         <strong>User:</strong> user@cveapp.local / user123
                     </small>
                 </div>
+                *@
             </div>
         </div>
     </div>

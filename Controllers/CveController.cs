@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
 using System.Globalization;
+using QuestPDF.Infrastructure;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
 
 namespace CveWebApp.Controllers
 {
@@ -124,6 +127,42 @@ namespace CveWebApp.Controllers
             return View(viewModel);
         }
 
+        // GET: Cve/ExportCompliance/5
+        [Authorize]
+        public async Task<IActionResult> ExportCompliance(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cveDetails = await _context.CveUpdateStagings
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (cveDetails == null)
+            {
+                return NotFound();
+            }
+
+            var viewModel = await BuildComplianceViewModelAsync(cveDetails);
+            
+            // Generate PDF
+            try
+            {
+                var document = CreateCompliancePdfDocument(viewModel);
+                var pdfBytes = document.GeneratePdf();
+                
+                var fileName = $"CVE_Compliance_Report_{cveDetails.Id}_{DateTime.Now:yyyyMMdd}.pdf";
+                return File(pdfBytes, "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                // Log error and redirect back with error message
+                TempData["ErrorMessage"] = $"Error generating PDF: {ex.Message}";
+                return RedirectToAction(nameof(ComplianceOverview), new { id });
+            }
+        }
+
         private async Task<ComplianceViewModel> BuildComplianceViewModelAsync(CveUpdateStaging cveDetails)
         {
             var viewModel = new ComplianceViewModel
@@ -178,6 +217,134 @@ namespace CveWebApp.Controllers
             };
 
             return viewModel;
+        }
+
+        private Document CreateCompliancePdfDocument(ComplianceViewModel viewModel)
+        {
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(10));
+
+                    page.Header()
+                        .Text("CVE Compliance Report")
+                        .SemiBold()
+                        .FontSize(16)
+                        .FontColor(Colors.Blue.Medium);
+
+                    page.Content()
+                        .PaddingVertical(1, Unit.Centimetre)
+                        .Column(column =>
+                        {
+                            // CVE Information Section
+                            column.Item().Text("CVE Information").SemiBold().FontSize(14);
+                            column.Item().PaddingBottom(10).Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(1);
+                                    columns.RelativeColumn(2);
+                                });
+
+                                table.Cell().Text("Product Family:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.ProductFamily ?? "N/A");
+
+                                table.Cell().Text("Product:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.Product ?? "N/A");
+
+                                table.Cell().Text("Article:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.Article ?? "N/A");
+
+                                table.Cell().Text("Max Severity:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.MaxSeverity ?? "N/A");
+
+                                table.Cell().Text("Release Date:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.ReleaseDate?.ToString("yyyy-MM-dd") ?? "N/A");
+
+                                table.Cell().Text("Required KBs:").SemiBold();
+                                table.Cell().Text(viewModel.RequiredKbs.Any() ? string.Join(", ", viewModel.RequiredKbs) : "None identified");
+                            });
+
+                            // Compliance Summary Section
+                            column.Item().PaddingTop(20).Text("Compliance Summary").SemiBold().FontSize(14);
+                            column.Item().PaddingBottom(10).Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(1);
+                                    columns.RelativeColumn(1);
+                                    columns.RelativeColumn(1);
+                                    columns.RelativeColumn(1);
+                                });
+
+                                table.Cell().Text("Total Servers").SemiBold();
+                                table.Cell().Text("Compliant").SemiBold();
+                                table.Cell().Text("Non-Compliant").SemiBold();
+                                table.Cell().Text("Compliance %").SemiBold();
+
+                                table.Cell().Text(viewModel.Summary.TotalServers.ToString());
+                                table.Cell().Text(viewModel.Summary.CompliantServers.ToString());
+                                table.Cell().Text(viewModel.Summary.NonCompliantServers.ToString());
+                                table.Cell().Text($"{viewModel.Summary.CompliancePercentage:F1}%");
+                            });
+
+                            // Server Details Section
+                            if (viewModel.ServerStatuses.Any())
+                            {
+                                column.Item().PaddingTop(20).Text("Server Compliance Details").SemiBold().FontSize(14);
+                                column.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(2);
+                                        columns.RelativeColumn(2);
+                                        columns.RelativeColumn(1);
+                                        columns.RelativeColumn(2);
+                                        columns.RelativeColumn(2);
+                                    });
+
+                                    // Header
+                                    table.Cell().Element(CellStyle).Text("Computer Name").SemiBold();
+                                    table.Cell().Element(CellStyle).Text("OS Product").SemiBold();
+                                    table.Cell().Element(CellStyle).Text("Status").SemiBold();
+                                    table.Cell().Element(CellStyle).Text("Installed KBs").SemiBold();
+                                    table.Cell().Element(CellStyle).Text("Missing KBs").SemiBold();
+
+                                    // Data rows
+                                    foreach (var server in viewModel.ServerStatuses)
+                                    {
+                                        table.Cell().Element(CellStyle).Text(server.Computer);
+                                        table.Cell().Element(CellStyle).Text(server.OSProduct);
+                                        table.Cell().Element(CellStyle).Text(server.IsCompliant ? 
+                                            (viewModel.RequiredKbs.Count == 0 ? "N/A" : "Compliant") : "Non-Compliant");
+                                        table.Cell().Element(CellStyle).Text(server.InstalledKbs.Any() ? 
+                                            string.Join(", ", server.InstalledKbs.Take(5)) + 
+                                            (server.InstalledKbs.Count > 5 ? $" (+{server.InstalledKbs.Count - 5} more)" : "") : "None");
+                                        table.Cell().Element(CellStyle).Text(server.MissingKbs.Any() ? 
+                                            string.Join(", ", server.MissingKbs) : "None");
+                                    }
+                                });
+                            }
+                        });
+
+                    page.Footer()
+                        .AlignCenter()
+                        .Text(x =>
+                        {
+                            x.Span("Generated on ");
+                            x.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                        });
+                });
+            });
+
+            static IContainer CellStyle(IContainer container)
+            {
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5);
+            }
         }
 
         private List<string> ExtractKbsFromArticle(string? article)
