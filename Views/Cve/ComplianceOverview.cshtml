@@ -35,6 +35,16 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-6">
+                <p><strong>CVE Number:</strong> 
+                    @if (!string.IsNullOrEmpty(Model.CveDetails.Details))
+                    {
+                        <span class="badge bg-primary">@Model.CveDetails.Details</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">Not specified</span>
+                    }
+                </p>
                 <p><strong>Product Family:</strong> @Model.CveDetails.ProductFamily</p>
                 <p><strong>Product:</strong> @Model.CveDetails.Product</p>
                 <p><strong>Article:</strong> @Model.CveDetails.Article</p>
