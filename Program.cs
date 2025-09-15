@@ -8,19 +8,32 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Configure Entity Framework with MariaDB
+// Choose database provider based on configuration
+var dbProvider = builder.Configuration["DatabaseProvider"] ?? "MariaDb"; // Default to MariaDb for compatibility
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
     if (!string.IsNullOrEmpty(connectionString))
     {
-        options.UseMySql(
-            connectionString,
-            new MySqlServerVersion(new Version(10, 5, 0)), // MariaDB 10.5+
-            mysqlOptions => mysqlOptions
-                .EnableRetryOnFailure()
-                .CommandTimeout(30)
-        );
+        if (dbProvider.Equals("MariaDb", StringComparison.OrdinalIgnoreCase))
+        {
+            options.UseMySql(
+                connectionString,
+                new MySqlServerVersion(new Version(10, 5, 0)), // MariaDB 10.5+
+                mysqlOptions => mysqlOptions
+                    .EnableRetryOnFailure()
+                    .CommandTimeout(30)
+            );
+        }
+        else if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure());
+        }
+        else
+        {
+            throw new Exception($"Unsupported DatabaseProvider: {dbProvider}");
+        }
     }
     else
     {
@@ -38,7 +51,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequiredLength = 4; // Simplified for testing
-    
+
     // Configure user requirements
     options.User.RequireUniqueEmail = true;
     options.SignIn.RequireConfirmedEmail = false;
@@ -64,13 +77,13 @@ if (app.Environment.IsDevelopment())
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        
+
         // Ensure database is created
         await context.Database.EnsureCreatedAsync();
-        
+
         // Seed roles and admin user
         await SeedRolesAndUsersAsync(userManager, roleManager);
-        
+
         // Seed test CVE data
         await SeedTestDataAsync(context);
     }
@@ -117,7 +130,7 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
     // Create default admin user if it doesn't exist
     var adminEmail = "admin@cveapp.local";
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
-    
+
     if (adminUser == null)
     {
         adminUser = new ApplicationUser
@@ -127,7 +140,7 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
             EmailConfirmed = true,
             FullName = "System Administrator"
         };
-        
+
         var result = await userManager.CreateAsync(adminUser, "admin123");
         if (result.Succeeded)
         {
@@ -138,7 +151,7 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
     // Create default test user if it doesn't exist
     var userEmail = "user@cveapp.local";
     var testUser = await userManager.FindByEmailAsync(userEmail);
-    
+
     if (testUser == null)
     {
         testUser = new ApplicationUser
@@ -148,7 +161,7 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
             EmailConfirmed = true,
             FullName = "Test User"
         };
-        
+
         var result = await userManager.CreateAsync(testUser, "user123");
         if (result.Succeeded)
         {
