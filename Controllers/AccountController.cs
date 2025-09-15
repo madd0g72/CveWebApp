@@ -99,6 +99,106 @@ namespace CveWebApp.Controllers
             return View();
         }
 
+        // GET: Account/ForgotPassword
+        [AllowAnonymous]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        // POST: Account/ForgotPassword
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+                if (user == null)
+                {
+                    // Don't reveal that the user does not exist
+                    return RedirectToAction(nameof(ForgotPasswordConfirmation));
+                }
+
+                // Generate password reset token
+                var code = await _userManager.GeneratePasswordResetTokenAsync(user);
+                
+                // In a production environment, you would send this via email
+                // For demo purposes, we'll store it in TempData to display it
+                TempData["ResetToken"] = code;
+                TempData["ResetEmail"] = model.Email;
+                
+                return RedirectToAction(nameof(ForgotPasswordConfirmation));
+            }
+
+            return View(model);
+        }
+
+        // GET: Account/ForgotPasswordConfirmation
+        [AllowAnonymous]
+        public IActionResult ForgotPasswordConfirmation()
+        {
+            return View();
+        }
+
+        // GET: Account/ResetPassword
+        [AllowAnonymous]
+        public IActionResult ResetPassword(string? code = null, string? email = null)
+        {
+            if (code == null)
+            {
+                return BadRequest("A code must be supplied for password reset.");
+            }
+            
+            var model = new ResetPasswordViewModel
+            {
+                Code = code,
+                Email = email ?? string.Empty
+            };
+            
+            return View(model);
+        }
+
+        // POST: Account/ResetPassword
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                // Don't reveal that the user does not exist
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
+            if (result.Succeeded)
+            {
+                return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+
+            return View(model);
+        }
+
+        // GET: Account/ResetPasswordConfirmation
+        [AllowAnonymous]
+        public IActionResult ResetPasswordConfirmation()
+        {
+            return View();
+        }
+
         #region Helpers
 
         private IActionResult RedirectToLocal(string? returnUrl)
