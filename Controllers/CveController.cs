@@ -250,6 +250,9 @@ namespace CveWebApp.Controllers
                                     columns.RelativeColumn(2);
                                 });
 
+                                table.Cell().Text("CVE Number:").SemiBold();
+                                table.Cell().Text(viewModel.CveDetails.Details ?? "Not specified").FontColor(Colors.Blue.Medium);
+
                                 table.Cell().Text("Product Family:").SemiBold();
                                 table.Cell().Text(viewModel.CveDetails.ProductFamily ?? "N/A");
 
@@ -266,7 +269,7 @@ namespace CveWebApp.Controllers
                                 table.Cell().Text(viewModel.CveDetails.ReleaseDate?.ToString("yyyy-MM-dd") ?? "N/A");
 
                                 table.Cell().Text("Required KBs:").SemiBold();
-                                table.Cell().Text(viewModel.RequiredKbs.Any() ? string.Join(", ", viewModel.RequiredKbs) : "None identified");
+                                table.Cell().Text(viewModel.RequiredKbs.Any() ? string.Join(", ", viewModel.RequiredKbs) : "None identified").FontColor(Colors.Blue.Lighten2);
                             });
 
                             // Compliance Summary Section
@@ -281,15 +284,18 @@ namespace CveWebApp.Controllers
                                     columns.RelativeColumn(1);
                                 });
 
-                                table.Cell().Text("Total Servers").SemiBold();
-                                table.Cell().Text("Compliant").SemiBold();
-                                table.Cell().Text("Non-Compliant").SemiBold();
-                                table.Cell().Text("Compliance %").SemiBold();
+                                table.Cell().Text("Total Servers").SemiBold().FontColor(Colors.Blue.Medium);
+                                table.Cell().Text("Compliant").SemiBold().FontColor(Colors.Green.Medium);
+                                table.Cell().Text("Non-Compliant").SemiBold().FontColor(Colors.Red.Medium);
+                                table.Cell().Text("Compliance %").SemiBold().FontColor(Colors.Blue.Medium);
 
-                                table.Cell().Text(viewModel.Summary.TotalServers.ToString());
-                                table.Cell().Text(viewModel.Summary.CompliantServers.ToString());
-                                table.Cell().Text(viewModel.Summary.NonCompliantServers.ToString());
-                                table.Cell().Text($"{viewModel.Summary.CompliancePercentage:F1}%");
+                                table.Cell().Text(viewModel.Summary.TotalServers.ToString()).FontColor(Colors.Blue.Medium);
+                                table.Cell().Text(viewModel.Summary.CompliantServers.ToString()).FontColor(Colors.Green.Medium);
+                                table.Cell().Text(viewModel.Summary.NonCompliantServers.ToString()).FontColor(Colors.Red.Medium);
+                                
+                                var complianceColor = viewModel.Summary.CompliancePercentage >= 80 ? Colors.Green.Medium :
+                                                     viewModel.Summary.CompliancePercentage >= 50 ? Colors.Orange.Medium : Colors.Red.Medium;
+                                table.Cell().Text($"{viewModel.Summary.CompliancePercentage:F1}%").FontColor(complianceColor).SemiBold();
                             });
 
                             // Server Details Section
@@ -308,24 +314,43 @@ namespace CveWebApp.Controllers
                                     });
 
                                     // Header
-                                    table.Cell().Element(CellStyle).Text("Computer Name").SemiBold();
-                                    table.Cell().Element(CellStyle).Text("OS Product").SemiBold();
-                                    table.Cell().Element(CellStyle).Text("Status").SemiBold();
-                                    table.Cell().Element(CellStyle).Text("Installed KBs").SemiBold();
-                                    table.Cell().Element(CellStyle).Text("Missing KBs").SemiBold();
+                                    table.Cell().Element(HeaderCellStyle).Text("Computer Name").SemiBold().FontColor(Colors.White);
+                                    table.Cell().Element(HeaderCellStyle).Text("OS Product").SemiBold().FontColor(Colors.White);
+                                    table.Cell().Element(HeaderCellStyle).Text("Status").SemiBold().FontColor(Colors.White);
+                                    table.Cell().Element(HeaderCellStyle).Text("Installed KBs").SemiBold().FontColor(Colors.White);
+                                    table.Cell().Element(HeaderCellStyle).Text("Missing KBs").SemiBold().FontColor(Colors.White);
 
                                     // Data rows
                                     foreach (var server in viewModel.ServerStatuses)
                                     {
-                                        table.Cell().Element(CellStyle).Text(server.Computer);
-                                        table.Cell().Element(CellStyle).Text(server.OSProduct);
-                                        table.Cell().Element(CellStyle).Text(server.IsCompliant ? 
-                                            (viewModel.RequiredKbs.Count == 0 ? "N/A" : "Compliant") : "Non-Compliant");
-                                        table.Cell().Element(CellStyle).Text(server.InstalledKbs.Any() ? 
+                                        Func<IContainer, IContainer> rowStyle;
+                                        if (server.IsCompliant)
+                                        {
+                                            rowStyle = viewModel.RequiredKbs.Count == 0 ? NeutralRowStyle : CompliantRowStyle;
+                                        }
+                                        else
+                                        {
+                                            rowStyle = NonCompliantRowStyle;
+                                        }
+
+                                        table.Cell().Element(rowStyle).Text(server.Computer).SemiBold();
+                                        table.Cell().Element(rowStyle).Text(server.OSProduct);
+                                        
+                                        var statusText = server.IsCompliant 
+                                            ? (viewModel.RequiredKbs.Count == 0 ? "N/A" : "Compliant") 
+                                            : "Non-Compliant";
+                                        var statusColor = server.IsCompliant 
+                                            ? (viewModel.RequiredKbs.Count == 0 ? Colors.Grey.Medium : Colors.Green.Medium)
+                                            : Colors.Red.Medium;
+                                        table.Cell().Element(rowStyle).Text(statusText).FontColor(statusColor).SemiBold();
+                                        
+                                        table.Cell().Element(rowStyle).Text(server.InstalledKbs.Any() ? 
                                             string.Join(", ", server.InstalledKbs.Take(5)) + 
                                             (server.InstalledKbs.Count > 5 ? $" (+{server.InstalledKbs.Count - 5} more)" : "") : "None");
-                                        table.Cell().Element(CellStyle).Text(server.MissingKbs.Any() ? 
-                                            string.Join(", ", server.MissingKbs) : "None");
+                                        
+                                        var missingKbsText = server.MissingKbs.Any() ? string.Join(", ", server.MissingKbs) : "None";
+                                        var missingKbsColor = server.MissingKbs.Any() ? Colors.Red.Medium : Colors.Green.Medium;
+                                        table.Cell().Element(rowStyle).Text(missingKbsText).FontColor(missingKbsColor);
                                     }
                                 });
                             }
@@ -344,6 +369,30 @@ namespace CveWebApp.Controllers
             static IContainer CellStyle(IContainer container)
             {
                 return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5);
+            }
+
+            static IContainer HeaderCellStyle(IContainer container)
+            {
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                    .Background(Colors.Grey.Darken3);
+            }
+
+            static IContainer CompliantRowStyle(IContainer container)
+            {
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                    .Background(Colors.Green.Lighten4);
+            }
+
+            static IContainer NonCompliantRowStyle(IContainer container)
+            {
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                    .Background(Colors.Yellow.Lighten4);
+            }
+
+            static IContainer NeutralRowStyle(IContainer container)
+            {
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                    .Background(Colors.Grey.Lighten4);
             }
         }
 
