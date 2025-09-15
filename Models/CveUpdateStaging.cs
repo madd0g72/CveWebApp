@@ -32,7 +32,7 @@ namespace CveWebApp.Models
         public string? MaxSeverity { get; set; }
 
         [Display(Name = "Article")]
-        [StringLength(255)]
+        [StringLength(500)]
         public string? Article { get; set; }
 
         [Display(Name = "Article Link")]

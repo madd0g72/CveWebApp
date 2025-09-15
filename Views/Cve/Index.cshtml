@@ -1,3 +1,4 @@
+@using System.Globalization
 @model IEnumerable<CveWebApp.Models.CveUpdateStaging>
 
 @{
@@ -6,7 +7,7 @@
 }
 
 <h1>CVE List</h1>
-<p>Total CVEs loaded: @Model.Count()</p>
+
 <form method="get" asp-action="Index" class="mb-3">
     <div class="row">
         <div class="col-md-2">
@@ -152,7 +153,7 @@
                     <td>@item.Product</td>
                     <td>@item.MaxSeverity</td>
                     <td>@item.Article</td>
-                    <td>@item.BaseScore</td>
+                    <td>@item.BaseScore?.ToString("F1", CultureInfo.InvariantCulture)</td>
                     <td>@item.Details</td>
                     <td>
                         <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm">Details</a>

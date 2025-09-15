@@ -1,3 +1,4 @@
+@using System.Globalization
 @model CveWebApp.Models.CveUpdateStaging
 
 @{
@@ -66,10 +67,10 @@
         </dd>
 
         <dt class="col-sm-2">Base Score</dt>
-        <dd class="col-sm-10">@Model.BaseScore</dd>
+        <dd class="col-sm-10">@Model.BaseScore?.ToString("F1", CultureInfo.InvariantCulture)</dd>
 
         <dt class="col-sm-2">Temporal Score</dt>
-        <dd class="col-sm-10">@Model.TemporalScore</dd>
+        <dd class="col-sm-10">@Model.TemporalScore?.ToString("F1", CultureInfo.InvariantCulture)</dd>
 
         <dt class="col-sm-2">Customer Action Required</dt>
         <dd class="col-sm-10">@Model.CustomerActionRequired</dd>
