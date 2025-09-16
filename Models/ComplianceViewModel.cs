@@ -10,6 +10,12 @@ namespace CveWebApp.Models
         public List<string> RequiredKbs { get; set; } = new();
     }
 
+    public class CveWithCompliance
+    {
+        public CveUpdateStaging Cve { get; set; } = new();
+        public double CompliancePercentage { get; set; }
+    }
+
     public class ServerComplianceStatus
     {
         public string Computer { get; set; } = string.Empty;

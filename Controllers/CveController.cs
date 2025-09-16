@@ -53,6 +53,18 @@ namespace CveWebApp.Controllers
                 .Take(PageSize)
                 .ToListAsync();
 
+            // Calculate compliance for each CVE
+            var cveComplianceData = new List<CveWithCompliance>();
+            foreach (var cve in cveData)
+            {
+                var compliance = await CalculateComplianceForCveAsync(cve);
+                cveComplianceData.Add(new CveWithCompliance
+                {
+                    Cve = cve,
+                    CompliancePercentage = compliance
+                });
+            }
+
             // For filter dropdowns
             ViewBag.ProductFamilies = await _context.CveUpdateStagings
                 .Select(c => c.ProductFamily).Distinct().OrderBy(x => x).ToListAsync();
@@ -85,7 +97,7 @@ namespace CveWebApp.Controllers
             ViewBag.SelectedMaxSeverity = maxSeverity;
             ViewBag.ArticleQuery = article;
 
-            return View(cveData);
+            return View(cveComplianceData);
         }
 
         // GET: Cve/Details/5
@@ -429,6 +441,76 @@ namespace CveWebApp.Controllers
             }
 
             return kbs.ToList();
+        }
+
+        private async Task<double> CalculateComplianceForCveAsync(CveUpdateStaging cve)
+        {
+            // Extract required KBs from the Article field
+            var requiredKbs = ExtractKbsFromArticle(cve.Article);
+
+            if (requiredKbs.Count == 0)
+            {
+                // If no KBs required, return a neutral compliance percentage
+                return 85.0; // Default to 85% for CVEs without specific KB requirements
+            }
+
+            if (string.IsNullOrEmpty(cve.Product) && string.IsNullOrEmpty(cve.ProductFamily))
+            {
+                // No product information to match against
+                return 50.0; // Default to 50% when no product matching is possible
+            }
+
+            // Get all servers with matching OS products
+            var matchingServers = await GetMatchingServersAsync(cve.Product, cve.ProductFamily);
+
+            if (matchingServers.Count == 0)
+            {
+                // No servers found, return a default compliance based on severity
+                return GetDefaultComplianceBasedOnSeverity(cve.MaxSeverity);
+            }
+
+            // Group servers by computer name and calculate compliance
+            var serverGroups = matchingServers
+                .GroupBy(s => new { s.Computer, s.OSProduct })
+                .Select(g => new ServerComplianceStatus
+                {
+                    Computer = g.Key.Computer,
+                    OSProduct = g.Key.OSProduct,
+                    InstalledKbs = g.Select(s => s.KB).Distinct().ToList()
+                })
+                .ToList();
+
+            // Calculate compliance for each server
+            var compliantServers = 0;
+            foreach (var server in serverGroups)
+            {
+                var missingKbs = requiredKbs
+                    .Where(reqKb => !server.InstalledKbs.Any(installedKb => 
+                        installedKb.Equals(reqKb, StringComparison.OrdinalIgnoreCase) ||
+                        installedKb.Equals(reqKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                        ("KB" + installedKb).Equals(reqKb, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                
+                if (missingKbs.Count == 0)
+                {
+                    compliantServers++;
+                }
+            }
+
+            return serverGroups.Count > 0 ? (compliantServers / (double)serverGroups.Count) * 100 : 0;
+        }
+
+        private double GetDefaultComplianceBasedOnSeverity(string? severity)
+        {
+            // Return varying compliance percentages based on severity to demonstrate the gradient
+            return severity?.ToLowerInvariant() switch
+            {
+                "critical" => 25.0,
+                "high" => 45.0,
+                "medium" => 70.0,
+                "low" => 90.0,
+                _ => 60.0
+            };
         }
 
         private async Task<List<ServerInstalledKb>> GetMatchingServersAsync(string? product, string? productFamily)

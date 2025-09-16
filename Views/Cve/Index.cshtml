@@ -1,9 +1,9 @@
 @using System.Globalization
-@model IEnumerable<CveWebApp.Models.CveUpdateStaging>
+@model IEnumerable<CveWebApp.Models.CveWithCompliance>
 
 @{
     ViewData["Title"] = "CVE List";
-    var firstItem = Model.FirstOrDefault();
+    var firstItem = Model.FirstOrDefault()?.Cve;
 }
 
 <h1>CVE List</h1>
@@ -106,6 +106,48 @@
 .high-score-row {
     background-color: #f8d7da !important; /* Light red background */
 }
+
+.compliance-bar {
+    width: 100%;
+    height: 20px;
+    border-radius: 10px;
+    position: relative;
+    background: linear-gradient(to right, #dc3545 0%, #ffc107 50%, #28a745 100%);
+    overflow: hidden;
+}
+
+.compliance-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+}
+
+.compliance-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    font-size: 12px;
+    color: #000;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+    z-index: 1;
+}
+
+.compliance-excellent {
+    background-color: #d4edda !important;
+}
+
+.compliance-good {
+    background-color: #fff3cd !important;
+}
+
+.compliance-poor {
+    background-color: #f8d7da !important;
+}
 </style>
 
 <table class="table">
@@ -132,6 +174,9 @@
             <th>
                 @(firstItem != null ? Html.DisplayNameFor(m => firstItem.Details) : "CVE")
             </th>
+            <th>
+                Compliance Status
+            </th>
             <th></th>
         </tr>
     </thead>
@@ -139,24 +184,32 @@
         @if (!Model.Any())
         {
             <tr>
-                <td colspan="8" class="text-center">No CVEs found.</td>
+                <td colspan="9" class="text-center">No CVEs found.</td>
             </tr>
         }
         else
         {
             foreach (var item in Model)
             {
-                var rowClass = (item.BaseScore > 8.0m) ? "table-danger high-score-row" : "";
-                <tr class="@rowClass">
-                    <td>@item.ReleaseDate?.ToString("yyyy-MM-dd")</td>
-                    <td>@item.ProductFamily</td>
-                    <td>@item.Product</td>
-                    <td>@item.MaxSeverity</td>
-                    <td>@item.Article</td>
-                    <td>@item.BaseScore?.ToString("F1", CultureInfo.InvariantCulture)</td>
-                    <td>@item.Details</td>
+                var rowClass = (item.Cve.BaseScore > 8.0m) ? "table-danger high-score-row" : "";
+                var complianceClass = item.CompliancePercentage >= 80 ? "compliance-excellent" : 
+                                     item.CompliancePercentage >= 50 ? "compliance-good" : "compliance-poor";
+                <tr class="@rowClass @complianceClass">
+                    <td>@item.Cve.ReleaseDate?.ToString("yyyy-MM-dd")</td>
+                    <td>@item.Cve.ProductFamily</td>
+                    <td>@item.Cve.Product</td>
+                    <td>@item.Cve.MaxSeverity</td>
+                    <td>@item.Cve.Article</td>
+                    <td>@item.Cve.BaseScore?.ToString("F1", CultureInfo.InvariantCulture)</td>
+                    <td>@item.Cve.Details</td>
+                    <td style="min-width: 120px;">
+                        <div class="compliance-bar">
+                            <div class="compliance-overlay" style="width: @(100 - item.CompliancePercentage)%;"></div>
+                            <span class="compliance-text">@item.CompliancePercentage.ToString("F1")%</span>
+                        </div>
+                    </td>
                     <td>
-                        <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-info btn-sm">Details</a>
+                        <a asp-action="Details" asp-route-id="@item.Cve.Id" class="btn btn-info btn-sm">Details</a>
                     </td>
                 </tr>
             }

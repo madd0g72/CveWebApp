@@ -218,9 +218,63 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
             Details = "CVE-2024-11111, CVE-2024-22222",
             BaseScore = 5.2m,
             CustomerActionRequired = true
+        },
+        new CveUpdateStaging
+        {
+            ReleaseDate = DateTime.Now.AddDays(-45),
+            ProductFamily = "Windows",
+            Product = "Windows Server 2019",
+            Platform = "x64",
+            Impact = "Low",
+            MaxSeverity = "Low",
+            Article = "KB5004567",
+            Details = "CVE-2024-88888",
+            BaseScore = 3.1m,
+            CustomerActionRequired = false
+        },
+        new CveUpdateStaging
+        {
+            ReleaseDate = DateTime.Now.AddDays(-60),
+            ProductFamily = "Office",
+            Product = "Microsoft Office 2021",
+            Platform = "x64",
+            Impact = "High",
+            MaxSeverity = "High",
+            Article = "KB5005678",
+            Details = "CVE-2024-77777",
+            BaseScore = 8.2m,
+            CustomerActionRequired = true
         }
     };
 
     context.CveUpdateStagings.AddRange(testCveRecords);
+
+    // Add some test server data to demonstrate actual compliance calculations
+    var testServerData = new List<ServerInstalledKb>
+    {
+        // Windows 10 servers with some KBs installed
+        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5001234" },
+        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5000123" },
+        new ServerInstalledKb { Computer = "WIN10-SRV-02", OSProduct = "Windows 10 Pro", KB = "5000456" },
+        
+        // Windows 11 servers
+        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5002345" },
+        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5001000" },
+        new ServerInstalledKb { Computer = "WIN11-SRV-02", OSProduct = "Windows 11 Pro", KB = "5001001" },
+        
+        // Office servers
+        new ServerInstalledKb { Computer = "OFFICE-SRV-01", OSProduct = "Microsoft Office 2019", KB = "5003456" },
+        new ServerInstalledKb { Computer = "OFFICE-SRV-02", OSProduct = "Microsoft Office 2019", KB = "5003000" },
+        
+        // Windows Server 2019
+        new ServerInstalledKb { Computer = "WS2019-SRV-01", OSProduct = "Windows Server 2019", KB = "5004567" },
+        new ServerInstalledKb { Computer = "WS2019-SRV-02", OSProduct = "Windows Server 2019", KB = "5004567" },
+        
+        // Office 2021 servers
+        new ServerInstalledKb { Computer = "O365-SRV-01", OSProduct = "Microsoft Office 2021", KB = "5005678" },
+        new ServerInstalledKb { Computer = "O365-SRV-02", OSProduct = "Microsoft Office 2021", KB = "5005000" }
+    };
+
+    context.ServerInstalledKbs.AddRange(testServerData);
     await context.SaveChangesAsync();
 }
