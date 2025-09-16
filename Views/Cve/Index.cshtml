@@ -111,18 +111,6 @@
     font-weight: bold;
     font-size: 14px;
 }
-
-.compliance-excellent {
-    background-color: #d4edda !important;
-}
-
-.compliance-good {
-    background-color: #fff3cd !important;
-}
-
-.compliance-poor {
-    background-color: #f8d7da !important;
-}
 </style>
 
 <table class="table">
@@ -167,10 +155,7 @@
             foreach (var item in Model)
             {
                 var rowClass = (item.Cve.BaseScore > 8.0m) ? "table-danger high-score-row" : "";
-                var complianceClass = (item.Cve.BaseScore > 8.0m) ? "" : 
-                                     (item.CompliancePercentage >= 80 ? "compliance-excellent" : 
-                                      item.CompliancePercentage >= 50 ? "compliance-good" : "compliance-poor");
-                <tr class="@rowClass @complianceClass">
+                <tr class="@rowClass">
                     <td>@item.Cve.ReleaseDate?.ToString("yyyy-MM-dd")</td>
                     <td>@item.Cve.ProductFamily</td>
                     <td>@item.Cve.Product</td>
