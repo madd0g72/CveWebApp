@@ -7,11 +7,12 @@ A web application for managing and importing CVE (Common Vulnerabilities and Exp
 - **CVE Dashboard**: View and analyze imported CVE data in a user-friendly dashboard.
 - **CSV Import**: Upload new CVE records via CSV files and update the staging database table *(Admin only)*.
 - **KB Import**: Dedicated interface for importing Knowledge Base (KB) articles *(Admin only)*.
+- **KB Supersedence Management**: Advanced compliance tracking that considers Knowledge Base supersedence relationships *(Admin only)*.
 - **Role-Based Access Control**: Secure admin-only import features with ASP.NET Core Identity.
 - **User Authentication**: Login/logout functionality with role-based navigation.
 - **Data Validation**: Ensures imported data matches the schema and provides user feedback.
 - **Responsive UI**: Built with Bootstrap for seamless desktop and mobile experience.
-- **Compliance Overview**: Analyze server compliance with KB patch requirements.
+- **Compliance Overview**: Analyze server compliance with KB patch requirements, including supersedence logic.
 
 ## Security & Authentication
 
@@ -96,7 +97,18 @@ For development and testing purposes:
 
 ### For Admin Users Only
 - **Import CVE Data**: Access via "Admin Tools" dropdown to upload new CSV files
-- **KB Import**: Access via "Admin Tools" dropdown for Knowledge Base data
+- **KB Import**: Access via "Admin Tools" dropdown for Knowledge Base data  
+- **KB Supersedence**: Access via "Admin Tools" dropdown to view and manage KB supersedence relationships
+
+### KB Supersedence Feature
+The application includes advanced KB supersedence functionality that improves compliance accuracy:
+
+- **Automatic Processing**: When CVE data is imported, supersedence relationships are automatically extracted from the "Supercedence" field
+- **Manual Processing**: Admins can manually trigger supersedence data processing for existing CVE records
+- **Enhanced Compliance**: Servers with newer KBs that supersede required KBs are automatically marked as compliant
+- **Relationship Management**: View all supersedence relationships in a dedicated admin interface
+
+**Example**: If a CVE requires KB5001234 but a server has KB5000456, and KB5000456 supersedes KB5001234, the server will be marked as compliant even without the exact KB mentioned in the CVE.
 
 ### Access Control
 - Admin features are only visible in navigation when logged in as an admin user
@@ -115,6 +127,10 @@ The application uses Entity Framework Core with the following main entities:
 
 ### ServerInstalledKb Table
 - Computer, OSProduct, KB, LastUpdated
+
+### KbSupersedence Table  
+- OriginalKb, SupersedingKb, Product, ProductFamily, DateAdded
+- Stores relationships where newer KBs replace older ones for compliance checking
 
 ### Identity Tables
 - AspNetUsers, AspNetRoles, AspNetUserRoles (standard Identity tables)

@@ -276,5 +276,39 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
     };
 
     context.ServerInstalledKbs.AddRange(testServerData);
+    
+    // Add test supersedence data to demonstrate the functionality
+    var testSupersedenceData = new List<KbSupersedence>
+    {
+        // KB5000456 supersedes KB5001234 (this will make WIN10-SRV-02 compliant)
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5001234", 
+            SupersedingKb = "KB5000456", 
+            Product = "Windows 10", 
+            ProductFamily = "Windows",
+            DateAdded = DateTime.UtcNow 
+        },
+        // KB5003000 supersedes KB5003456 (for Office scenarios)
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5003456", 
+            SupersedingKb = "KB5003000", 
+            Product = "Microsoft Office 2019", 
+            ProductFamily = "Office",
+            DateAdded = DateTime.UtcNow 
+        },
+        // KB5002345 supersedes KB5002000 (for Windows 11 scenarios)
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5002000", 
+            SupersedingKb = "KB5002345", 
+            Product = "Windows 11", 
+            ProductFamily = "Windows",
+            DateAdded = DateTime.UtcNow 
+        }
+    };
+    
+    context.KbSupersedences.AddRange(testSupersedenceData);
     await context.SaveChangesAsync();
 }

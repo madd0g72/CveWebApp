@@ -205,15 +205,14 @@ namespace CveWebApp.Controllers
                 })
                 .ToList();
 
-            // Calculate compliance for each server
+            // Calculate compliance for each server with supersedence consideration
             foreach (var server in serverGroups)
             {
-                server.MissingKbs = viewModel.RequiredKbs
-                    .Where(reqKb => !server.InstalledKbs.Any(installedKb => 
-                        installedKb.Equals(reqKb, StringComparison.OrdinalIgnoreCase) ||
-                        installedKb.Equals(reqKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                        ("KB" + installedKb).Equals(reqKb, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
+                server.MissingKbs = await GetMissingKbsWithSupersedence(
+                    viewModel.RequiredKbs, 
+                    server.InstalledKbs, 
+                    cveDetails.Product, 
+                    cveDetails.ProductFamily);
                 
                 server.IsCompliant = viewModel.RequiredKbs.Count == 0 || server.MissingKbs.Count == 0;
             }
@@ -536,6 +535,37 @@ namespace CveWebApp.Controllers
             return View();
         }
 
+        // POST: Cve/ProcessSupersedence - Admin only
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessSupersedence()
+        {
+            try
+            {
+                await ProcessSupersedenceDataAsync();
+                TempData["SuccessMessage"] = "Supersedence data processed successfully!";
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error processing supersedence data: {ex.Message}";
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        // GET: Cve/Supersedence - Admin only
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Supersedence()
+        {
+            var supersedences = await _context.KbSupersedences
+                .OrderBy(k => k.OriginalKb)
+                .ThenBy(k => k.SupersedingKb)
+                .ToListAsync();
+
+            return View(supersedences);
+        }
+
         // POST: Cve/Import - Admin only
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -619,7 +649,17 @@ namespace CveWebApp.Controllers
                 if (importedCount > 0 && errors.Count < 10)
                 {
                     await _context.SaveChangesAsync();
-                    ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}";
+                    
+                    // Process supersedence data after successful import
+                    try
+                    {
+                        await ProcessSupersedenceDataAsync();
+                        ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}. Supersedence data processed.";
+                    }
+                    catch (Exception ex)
+                    {
+                        ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}. Warning: Supersedence processing failed: {ex.Message}";
+                    }
                     
                     if (errors.Count > 0)
                     {
@@ -837,6 +877,179 @@ namespace CveWebApp.Controllers
             }
 
             return record;
+        }
+
+        /// <summary>
+        /// Processes supersedence data from CVE records and populates the KB supersedence table
+        /// </summary>
+        private async Task ProcessSupersedenceDataAsync()
+        {
+            var cveRecords = await _context.CveUpdateStagings
+                .Where(c => !string.IsNullOrEmpty(c.Supercedence))
+                .ToListAsync();
+
+            foreach (var cveRecord in cveRecords)
+            {
+                await ProcessSupersedenceForRecord(cveRecord);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Processes supersedence data for a single CVE record
+        /// </summary>
+        private async Task ProcessSupersedenceForRecord(CveUpdateStaging cveRecord)
+        {
+            if (string.IsNullOrEmpty(cveRecord.Supercedence))
+                return;
+
+            var requiredKbs = ExtractKbsFromArticle(cveRecord.Article);
+            var supersedingKbs = ExtractKbsFromSupersedence(cveRecord.Supercedence);
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                foreach (var supersedingKb in supersedingKbs)
+                {
+                    // Check if this supersedence relationship already exists
+                    var existingSupersedence = await _context.KbSupersedences
+                        .FirstOrDefaultAsync(k => k.OriginalKb == requiredKb && k.SupersedingKb == supersedingKb);
+
+                    if (existingSupersedence == null)
+                    {
+                        var supersedence = new KbSupersedence
+                        {
+                            OriginalKb = requiredKb,
+                            SupersedingKb = supersedingKb,
+                            Product = cveRecord.Product,
+                            ProductFamily = cveRecord.ProductFamily,
+                            DateAdded = DateTime.UtcNow
+                        };
+
+                        _context.KbSupersedences.Add(supersedence);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Extracts KB numbers from supersedence field
+        /// </summary>
+        private List<string> ExtractKbsFromSupersedence(string? supersedence)
+        {
+            if (string.IsNullOrEmpty(supersedence))
+                return new List<string>();
+
+            var kbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            
+            // Look for KB patterns like "KB1234567" or "kb1234567"
+            var kbPattern = new System.Text.RegularExpressions.Regex(@"\bKB\d{6,7}\b", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var matches = kbPattern.Matches(supersedence);
+            
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                kbs.Add(match.Value.ToUpper());
+            }
+
+            // Also look for bare 6-7 digit numbers and normalize them to KB format
+            var bareNumberPattern = new System.Text.RegularExpressions.Regex(@"\b\d{6,7}\b");
+            var bareMatches = bareNumberPattern.Matches(supersedence);
+            
+            foreach (System.Text.RegularExpressions.Match match in bareMatches)
+            {
+                var kbFormatted = "KB" + match.Value;
+                kbs.Add(kbFormatted);
+            }
+
+            return kbs.ToList();
+        }
+
+        /// <summary>
+        /// Checks if a server is compliant with required KBs considering supersedence
+        /// </summary>
+        private async Task<bool> IsServerCompliantWithSupersedence(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
+        {
+            if (requiredKbs.Count == 0)
+                return true;
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                bool hasRequiredOrSuperseding = false;
+
+                // Check if the exact KB is installed
+                if (installedKbs.Any(installedKb => 
+                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
+                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
+                {
+                    hasRequiredOrSuperseding = true;
+                }
+                else
+                {
+                    // Check if any installed KB supersedes the required KB
+                    var supersedingKbs = await _context.KbSupersedences
+                        .Where(k => k.OriginalKb == requiredKb)
+                        .Where(k => product == null || k.Product == null || k.Product == product)
+                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
+                        .Select(k => k.SupersedingKb)
+                        .ToListAsync();
+
+                    hasRequiredOrSuperseding = supersedingKbs.Any(supersedingKb =>
+                        installedKbs.Any(installedKb =>
+                            installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
+                            installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                            ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase)));
+                }
+
+                if (!hasRequiredOrSuperseding)
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the missing KBs for a server considering supersedence
+        /// </summary>
+        private async Task<List<string>> GetMissingKbsWithSupersedence(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
+        {
+            var missingKbs = new List<string>();
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                bool hasRequiredOrSuperseding = false;
+
+                // Check if the exact KB is installed
+                if (installedKbs.Any(installedKb => 
+                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
+                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
+                {
+                    hasRequiredOrSuperseding = true;
+                }
+                else
+                {
+                    // Check if any installed KB supersedes the required KB
+                    var supersedingKbs = await _context.KbSupersedences
+                        .Where(k => k.OriginalKb == requiredKb)
+                        .Where(k => product == null || k.Product == null || k.Product == product)
+                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
+                        .Select(k => k.SupersedingKb)
+                        .ToListAsync();
+
+                    hasRequiredOrSuperseding = supersedingKbs.Any(supersedingKb =>
+                        installedKbs.Any(installedKb =>
+                            installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
+                            installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                            ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase)));
+                }
+
+                if (!hasRequiredOrSuperseding)
+                    missingKbs.Add(requiredKb);
+            }
+
+            return missingKbs;
         }
 
     }
