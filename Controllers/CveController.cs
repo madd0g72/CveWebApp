@@ -228,20 +228,28 @@ namespace CveWebApp.Controllers
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
                     page.PageColor(Colors.White);
-                    page.DefaultTextStyle(x => x.FontSize(10));
+                    page.DefaultTextStyle(x => x.FontSize(8));
 
                     page.Header()
-                        .Text("CVE Compliance Report")
-                        .SemiBold()
-                        .FontSize(16)
-                        .FontColor(Colors.Blue.Medium);
+                        .Row(row =>
+                        {
+                            row.RelativeItem().Text("CVE Compliance Report")
+                                .SemiBold()
+                                .FontSize(14)
+                                .FontColor(Colors.Blue.Medium);
+                            
+                            row.AutoItem().Text($"CVE: {viewModel.CveDetails.Details ?? "Not specified"}")
+                                .SemiBold()
+                                .FontSize(12)
+                                .FontColor(Colors.Red.Medium);
+                        });
 
                     page.Content()
                         .PaddingVertical(1, Unit.Centimetre)
                         .Column(column =>
                         {
                             // CVE Information Section
-                            column.Item().Text("CVE Information").SemiBold().FontSize(14);
+                            column.Item().Text("CVE Information").SemiBold().FontSize(12);
                             column.Item().PaddingBottom(10).Table(table =>
                             {
                                 table.ColumnsDefinition(columns =>
@@ -273,7 +281,7 @@ namespace CveWebApp.Controllers
                             });
 
                             // Compliance Summary Section
-                            column.Item().PaddingTop(20).Text("Compliance Summary").SemiBold().FontSize(14);
+                            column.Item().PaddingTop(15).Text("Compliance Summary").SemiBold().FontSize(12);
                             column.Item().PaddingBottom(10).Table(table =>
                             {
                                 table.ColumnsDefinition(columns =>
@@ -301,7 +309,7 @@ namespace CveWebApp.Controllers
                             // Server Details Section
                             if (viewModel.ServerStatuses.Any())
                             {
-                                column.Item().PaddingTop(20).Text("Server Compliance Details").SemiBold().FontSize(14);
+                                column.Item().PaddingTop(15).Text("Server Compliance Details").SemiBold().FontSize(12);
                                 column.Item().Table(table =>
                                 {
                                     table.ColumnsDefinition(columns =>
@@ -357,41 +365,40 @@ namespace CveWebApp.Controllers
                         });
 
                     page.Footer()
-                        .AlignCenter()
-                        .Text(x =>
+                        .Row(row =>
                         {
-                            x.Span("Generated on ");
-                            x.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                            row.RelativeItem().Text($"CVE: {viewModel.CveDetails.Details ?? "Not specified"}")
+                                .FontSize(9)
+                                .FontColor(Colors.Grey.Darken1);
+                            
+                            row.AutoItem().Text($"Generated on {DateTime.Now:yyyy-MM-dd HH:mm} | Page ")
+                                .FontSize(9)
+                                .FontColor(Colors.Grey.Darken1);
                         });
                 });
             });
 
-            static IContainer CellStyle(IContainer container)
-            {
-                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5);
-            }
-
             static IContainer HeaderCellStyle(IContainer container)
             {
-                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3)
                     .Background(Colors.Grey.Darken3);
             }
 
             static IContainer CompliantRowStyle(IContainer container)
             {
-                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3)
                     .Background(Colors.Green.Lighten4);
             }
 
             static IContainer NonCompliantRowStyle(IContainer container)
             {
-                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3)
                     .Background(Colors.Yellow.Lighten4);
             }
 
             static IContainer NeutralRowStyle(IContainer container)
             {
-                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5)
+                return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3)
                     .Background(Colors.Grey.Lighten4);
             }
         }
