@@ -17,6 +17,7 @@ namespace CveWebApp.Data
         public DbSet<CveUpdateStaging> CveUpdateStagings { get; set; }
         public DbSet<ServerInstalledKb> ServerInstalledKbs { get; set; }
         public DbSet<LoginAttempt> LoginAttempts { get; set; }
+        public DbSet<KbSupersedence> KbSupersedences { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -57,6 +58,22 @@ namespace CveWebApp.Data
 
             modelBuilder.Entity<LoginAttempt>()
                 .HasIndex(e => e.IsSuccess);
+
+            // Configure KbSupersedence entity
+            modelBuilder.Entity<KbSupersedence>()
+                .ToTable("KbSupersedences");
+
+            // Create indexes for better query performance on KB supersedence
+            modelBuilder.Entity<KbSupersedence>()
+                .HasIndex(e => e.OriginalKb);
+
+            modelBuilder.Entity<KbSupersedence>()
+                .HasIndex(e => e.SupersedingKb);
+
+            // Create composite index for supersedence relationships
+            modelBuilder.Entity<KbSupersedence>()
+                .HasIndex(e => new { e.OriginalKb, e.SupersedingKb })
+                .IsUnique();
         }
     }
 }
