@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
+using CveWebApp.Services;
 using System.Globalization;
 using QuestPDF.Infrastructure;
 using QuestPDF.Fluent;
@@ -16,11 +17,13 @@ namespace CveWebApp.Controllers
     public class CveController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<CveController> _logger;
         private const int PageSize = 20; // Set your preferred page size here
 
-        public CveController(ApplicationDbContext context)
+        public CveController(ApplicationDbContext context, ILogger<CveController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: Cve
@@ -545,7 +548,10 @@ namespace CveWebApp.Controllers
         {
             try
             {
-                await ProcessSupersedenceDataAsync();
+                var loggerFactory = HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+                var csvDataLoaderLogger = loggerFactory.CreateLogger<CsvDataLoader>();
+                var csvDataLoader = new CsvDataLoader(_context, csvDataLoaderLogger);
+                await csvDataLoader.ProcessSupersedenceRelationshipsAsync();
                 TempData["SuccessMessage"] = "Supersedence data processed successfully!";
             }
             catch (Exception ex)
@@ -655,7 +661,10 @@ namespace CveWebApp.Controllers
                     // Process supersedence data after successful import
                     try
                     {
-                        await ProcessSupersedenceDataAsync();
+                        var loggerFactory = HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+                        var csvDataLoaderLogger = loggerFactory.CreateLogger<CsvDataLoader>();
+                        var csvDataLoader = new CsvDataLoader(_context, csvDataLoaderLogger);
+                        await csvDataLoader.ProcessSupersedenceRelationshipsAsync();
                         ViewBag.SuccessMessage = $"Import completed successfully! New records: {importedCount}. Supersedence data processed.";
                     }
                     catch (Exception ex)
@@ -879,59 +888,6 @@ namespace CveWebApp.Controllers
             }
 
             return record;
-        }
-
-        /// <summary>
-        /// Processes supersedence data from CVE records and populates the KB supersedence table
-        /// </summary>
-        private async Task ProcessSupersedenceDataAsync()
-        {
-            var cveRecords = await _context.CveUpdateStagings
-                .Where(c => !string.IsNullOrEmpty(c.Supercedence))
-                .ToListAsync();
-
-            foreach (var cveRecord in cveRecords)
-            {
-                await ProcessSupersedenceForRecord(cveRecord);
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
-        /// <summary>
-        /// Processes supersedence data for a single CVE record
-        /// </summary>
-        private async Task ProcessSupersedenceForRecord(CveUpdateStaging cveRecord)
-        {
-            if (string.IsNullOrEmpty(cveRecord.Supercedence))
-                return;
-
-            var requiredKbs = ExtractKbsFromArticle(cveRecord.Article);
-            var supersedingKbs = ExtractKbsFromSupersedence(cveRecord.Supercedence);
-
-            foreach (var requiredKb in requiredKbs)
-            {
-                foreach (var supersedingKb in supersedingKbs)
-                {
-                    // Check if this supersedence relationship already exists
-                    var existingSupersedence = await _context.KbSupersedences
-                        .FirstOrDefaultAsync(k => k.OriginalKb == requiredKb && k.SupersedingKb == supersedingKb);
-
-                    if (existingSupersedence == null)
-                    {
-                        var supersedence = new KbSupersedence
-                        {
-                            OriginalKb = requiredKb,
-                            SupersedingKb = supersedingKb,
-                            Product = cveRecord.Product,
-                            ProductFamily = cveRecord.ProductFamily,
-                            DateAdded = DateTime.UtcNow
-                        };
-
-                        _context.KbSupersedences.Add(supersedence);
-                    }
-                }
-            }
         }
 
         /// <summary>

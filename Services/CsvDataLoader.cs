@@ -161,6 +161,31 @@ namespace CveWebApp.Services
         {
             _logger.LogInformation("Processing supersedence relationships from CVE data");
 
+            // Step 1: Clear existing supersedence data to rebuild fresh chains
+            var existingCount = await _context.KbSupersedences.CountAsync();
+            if (existingCount > 0)
+            {
+                _logger.LogInformation("Clearing {Count} existing supersedence relationships for fresh rebuild", existingCount);
+                _context.KbSupersedences.RemoveRange(_context.KbSupersedences);
+                await _context.SaveChangesAsync();
+            }
+
+            // Step 2: Build direct supersedence relationships from CVE data
+            await BuildDirectSupersedenceRelationshipsAsync();
+
+            // Step 3: Build transitive supersedence chains to ensure comprehensive coverage
+            await BuildTransitiveSupersedenceRelationshipsAsync();
+
+            _logger.LogInformation("Supersedence relationship processing completed");
+        }
+
+        /// <summary>
+        /// Builds direct supersedence relationships from CVE data
+        /// </summary>
+        private async Task BuildDirectSupersedenceRelationshipsAsync()
+        {
+            _logger.LogInformation("Building direct supersedence relationships from CVE data");
+
             var cveRecords = await _context.CveUpdateStagings
                 .Where(c => !string.IsNullOrEmpty(c.Supercedence) && !string.IsNullOrEmpty(c.Article))
                 .ToListAsync();
@@ -179,8 +204,8 @@ namespace CveWebApp.Services
                         foreach (var supersededKb in supersededKbs)
                         {
                             // Check if this supersedence relationship already exists
-                            var existingSupersedence = await _context.KbSupersedences
-                                .FirstOrDefaultAsync(k => k.OriginalKb == supersededKb && k.SupersedingKb == requiredKb);
+                            var existingSupersedence = supersedenceRecords
+                                .FirstOrDefault(k => k.OriginalKb == supersededKb && k.SupersedingKb == requiredKb);
 
                             if (existingSupersedence == null)
                             {
@@ -206,8 +231,86 @@ namespace CveWebApp.Services
             {
                 _context.KbSupersedences.AddRange(supersedenceRecords);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Processed {Count} supersedence relationships", supersedenceRecords.Count);
+                _logger.LogInformation("Built {Count} direct supersedence relationships", supersedenceRecords.Count);
             }
+        }
+
+        /// <summary>
+        /// Builds transitive supersedence relationships to create comprehensive chains
+        /// If A supersedes B and B supersedes C, this creates A supersedes C relationships
+        /// </summary>
+        private async Task BuildTransitiveSupersedenceRelationshipsAsync()
+        {
+            _logger.LogInformation("Building transitive supersedence relationships");
+
+            var maxIterations = 10; // Prevent infinite loops in circular dependencies
+            var iterationCount = 0;
+            var newRelationshipsAdded = true;
+
+            while (newRelationshipsAdded && iterationCount < maxIterations)
+            {
+                iterationCount++;
+                _logger.LogInformation("Transitive supersedence iteration {Iteration}", iterationCount);
+
+                newRelationshipsAdded = false;
+
+                // Get all current supersedence relationships
+                var currentRelationships = await _context.KbSupersedences
+                    .Select(k => new { k.OriginalKb, k.SupersedingKb, k.Product, k.ProductFamily })
+                    .ToListAsync();
+
+                var newTransitiveRelationships = new List<KbSupersedence>();
+
+                // For each relationship A → B, find all relationships B → C to create A → C
+                foreach (var relationship in currentRelationships)
+                {
+                    var transitiveTargets = currentRelationships
+                        .Where(r => r.OriginalKb == relationship.SupersedingKb)
+                        .Where(r => r.SupersedingKb != relationship.OriginalKb) // Avoid circular references
+                        .ToList();
+
+                    foreach (var transitiveTarget in transitiveTargets)
+                    {
+                        // Check if A → C relationship already exists
+                        var existsInDb = await _context.KbSupersedences
+                            .AnyAsync(k => k.OriginalKb == relationship.OriginalKb && 
+                                          k.SupersedingKb == transitiveTarget.SupersedingKb);
+
+                        var existsInNewList = newTransitiveRelationships
+                            .Any(k => k.OriginalKb == relationship.OriginalKb && 
+                                     k.SupersedingKb == transitiveTarget.SupersedingKb);
+
+                        if (!existsInDb && !existsInNewList)
+                        {
+                            newTransitiveRelationships.Add(new KbSupersedence
+                            {
+                                OriginalKb = relationship.OriginalKb,
+                                SupersedingKb = transitiveTarget.SupersedingKb,
+                                Product = relationship.Product ?? transitiveTarget.Product,
+                                ProductFamily = relationship.ProductFamily ?? transitiveTarget.ProductFamily,
+                                DateAdded = DateTime.UtcNow
+                            });
+                            newRelationshipsAdded = true;
+                        }
+                    }
+                }
+
+                if (newTransitiveRelationships.Any())
+                {
+                    _context.KbSupersedences.AddRange(newTransitiveRelationships);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Added {Count} transitive supersedence relationships in iteration {Iteration}", 
+                        newTransitiveRelationships.Count, iterationCount);
+                }
+            }
+
+            if (iterationCount >= maxIterations)
+            {
+                _logger.LogWarning("Reached maximum iterations ({MaxIterations}) for transitive supersedence building", maxIterations);
+            }
+
+            var totalRelationships = await _context.KbSupersedences.CountAsync();
+            _logger.LogInformation("Transitive supersedence building completed. Total relationships: {Total}", totalRelationships);
         }
 
         private string[] ParseCsvLine(string line)
