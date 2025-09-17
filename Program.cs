@@ -12,8 +12,30 @@ QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure logging to include file-based application logging
+builder.Logging.ClearProviders(); // Clear default providers
+builder.Logging.AddConsole(); // Add console logging back
+builder.Logging.AddDebug(); // Add debug logging back
+
+// Add custom file logger provider for framework and application logs
+if (builder.Configuration.GetValue<bool>("FileLogging:Enabled", false) && 
+    builder.Configuration.GetValue<bool>("FileLogging:ApplicationLoggingEnabled", false))
+{
+    builder.Logging.AddProvider(new CveWebApp.Services.FileLoggerProvider(builder.Configuration, builder.Environment));
+}
+
+// Configure specific log levels for different categories
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Infrastructure", LogLevel.Information);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting", LogLevel.Information);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Routing", LogLevel.Information);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Authentication", LogLevel.Information);
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Add file logging service
+builder.Services.AddScoped<CveWebApp.Services.IFileLoggingService, CveWebApp.Services.FileLoggingService>();
 
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
@@ -52,6 +74,25 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     {
         // Use in-memory DB for testing/demo if no connection string is given
         options.UseInMemoryDatabase("TestDatabase");
+    }
+
+    // Enable detailed Entity Framework logging
+    if (builder.Configuration.GetValue<bool>("FileLogging:ApplicationLoggingEnabled", false))
+    {
+        options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
+        options.EnableDetailedErrors(builder.Environment.IsDevelopment());
+        options.LogTo(message => 
+        {
+            // This will be captured by our custom logger provider
+            var logger = LoggerFactory.Create(config => 
+            {
+                if (builder.Configuration.GetValue<bool>("FileLogging:Enabled", false))
+                {
+                    config.AddProvider(new CveWebApp.Services.FileLoggerProvider(builder.Configuration, builder.Environment));
+                }
+            }).CreateLogger("EntityFramework");
+            logger.LogInformation(message);
+        }, LogLevel.Information);
     }
 });
 
