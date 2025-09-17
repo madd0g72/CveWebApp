@@ -15,21 +15,16 @@ namespace CveWebApp.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _context;
+        private readonly IFileLoggingService _fileLoggingService;
         private readonly IWebHostEnvironment _environment;
 
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IWebHostEnvironment environment)
-        private readonly IFileLoggingService _fileLoggingService;
-
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IFileLoggingService fileLoggingService)
-
+        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IFileLoggingService fileLoggingService, IWebHostEnvironment environment)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
-
-            _environment = environment;
             _fileLoggingService = fileLoggingService;
-
+            _environment = environment;
         }
 
         // GET: Account/Login
