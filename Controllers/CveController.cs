@@ -910,23 +910,24 @@ namespace CveWebApp.Controllers
             if (string.IsNullOrEmpty(cveRecord.Supercedence))
                 return;
 
-            var requiredKbs = ExtractKbsFromArticle(cveRecord.Article);
-            var supersedingKbs = ExtractKbsFromSupersedence(cveRecord.Supercedence);
+            var currentKbs = ExtractKbsFromArticle(cveRecord.Article);
+            var supersededKbs = ExtractKbsFromSupersedence(cveRecord.Supercedence);
 
-            foreach (var requiredKb in requiredKbs)
+            foreach (var currentKb in currentKbs)
             {
-                foreach (var supersedingKb in supersedingKbs)
+                foreach (var supersededKb in supersededKbs)
                 {
                     // Check if this supersedence relationship already exists
+                    // Current KB supersedes the superseded KB
                     var existingSupersedence = await _context.KbSupersedences
-                        .FirstOrDefaultAsync(k => k.OriginalKb == requiredKb && k.SupersedingKb == supersedingKb);
+                        .FirstOrDefaultAsync(k => k.OriginalKb == supersededKb && k.SupersedingKb == currentKb);
 
                     if (existingSupersedence == null)
                     {
                         var supersedence = new KbSupersedence
                         {
-                            OriginalKb = requiredKb,
-                            SupersedingKb = supersedingKb,
+                            OriginalKb = supersededKb,      // The KB being superseded
+                            SupersedingKb = currentKb,      // The KB doing the superseding
                             Product = cveRecord.Product,
                             ProductFamily = cveRecord.ProductFamily,
                             DateAdded = DateTime.UtcNow

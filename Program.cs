@@ -420,6 +420,9 @@ async Task LoadServerKbDataFromCsvAsync(ApplicationDbContext context)
 
 async Task ProcessSupersedenceDataFromCsvAsync(ApplicationDbContext context)
 {
+    // Clear existing supersedence data to rebuild with correct logic
+    context.KbSupersedences.RemoveRange(context.KbSupersedences);
+    
     var supersedenceRecords = new List<KbSupersedence>();
     var processedPairs = new HashSet<string>();
     
@@ -445,8 +448,8 @@ async Task ProcessSupersedenceDataFromCsvAsync(ApplicationDbContext context)
         
         supersedenceRecords.Add(new KbSupersedence
         {
-            OriginalKb = supersededKb,
-            SupersedingKb = currentKb,
+            OriginalKb = supersededKb,        // The KB being superseded
+            SupersedingKb = currentKb,        // The KB doing the superseding
             Product = cveRecord.Product,
             ProductFamily = cveRecord.ProductFamily,
             DateAdded = DateTime.UtcNow
