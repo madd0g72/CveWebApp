@@ -484,18 +484,17 @@ namespace CveWebApp.Controllers
                 })
                 .ToList();
 
-            // Calculate compliance for each server
+            // Calculate compliance for each server using the same supersedence logic as detailed view
             var compliantServers = 0;
             foreach (var server in serverGroups)
             {
-                var missingKbs = requiredKbs
-                    .Where(reqKb => !server.InstalledKbs.Any(installedKb => 
-                        installedKb.Equals(reqKb, StringComparison.OrdinalIgnoreCase) ||
-                        installedKb.Equals(reqKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                        ("KB" + installedKb).Equals(reqKb, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
+                var complianceResult = await GetServerComplianceWithSupersedenceDetails(
+                    requiredKbs, 
+                    server.InstalledKbs, 
+                    cve.Product, 
+                    cve.ProductFamily);
                 
-                if (missingKbs.Count == 0)
+                if (complianceResult.IsCompliant)
                 {
                     compliantServers++;
                 }
