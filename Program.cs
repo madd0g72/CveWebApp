@@ -384,6 +384,11 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
         new ServerInstalledKb { Computer = "WS2019-SRV-03", OSProduct = "Windows Server 2019", KB = "5058383" }, // Has required KB for CVE-2025-29833
         new ServerInstalledKb { Computer = "WS2019-SRV-04", OSProduct = "Windows Server 2019", KB = "5059123" }, // Has superseding KB for CVE-2025-29833
         
+        // Real server test - wc-docprot-fe1.lottomatica.net with superseding KB
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows 10 Enterprise", KB = "5059123" }, // Has superseding KB for CVE-2025-29833
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows 10 Enterprise", KB = "5001000" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows 10 Enterprise", KB = "5002500" },
+        
         // Office 2021 servers
         new ServerInstalledKb { Computer = "O365-SRV-01", OSProduct = "Microsoft Office 2021", KB = "5005678" },
         new ServerInstalledKb { Computer = "O365-SRV-02", OSProduct = "Microsoft Office 2021", KB = "5005000" }
