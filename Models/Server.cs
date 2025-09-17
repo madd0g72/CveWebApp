@@ -51,6 +51,14 @@ namespace CveWebApp.Models
         [Display(Name = "OS Version")]
         public string? OperatingSystemVersion { get; set; }
 
+        [StringLength(255)]
+        [Display(Name = "Build")]
+        public string? Build { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "Status")]
+        public string? Status { get; set; }
+
         [Display(Name = "Last Boot Time")]
         public DateTime? LastBootTime { get; set; }
 
@@ -71,6 +79,10 @@ namespace CveWebApp.Models
         [StringLength(500)]
         [Display(Name = "Maintenance Windows")]
         public string? MaintenanceWindows { get; set; }
+
+        [StringLength(1000)]
+        [Display(Name = "Services")]
+        public string? Services { get; set; }
 
         [Display(Name = "Created Date")]
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;

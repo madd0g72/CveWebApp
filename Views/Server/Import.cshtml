@@ -66,31 +66,69 @@
                     <h6>Required Column:</h6>
                     <ul>
                         <li><strong>ServerName</strong> - Unique identifier for the server (required for all operations)</li>
+                        <li><strong>VM</strong> - Alternative server name column (CSV1 format)</li>
                     </ul>
                     
-                    <h6>Optional Columns:</h6>
+                    <h6>CSV1 Infrastructure Columns (VM/ESXi data):</h6>
                     <div class="row">
                         <div class="col-md-6">
                             <ul>
                                 <li>VCenter</li>
                                 <li>Cluster</li>
-                                <li>Project</li>
-                                <li>Environment</li>
-                                <li>IDEL</li>
-                                <li>ServerIP</li>
-                                <li>ManagementIP (or "ServerIP (mgt)")</li>
+                                <li>VM (Server Name)</li>
+                                <li>Status</li>
+                                <li>OS (Operating System)</li>
                             </ul>
                         </div>
                         <div class="col-md-6">
                             <ul>
+                                <li>Service_Owner (Service Owner)</li>
+                                <li>Project</li>
+                                <li>IDEL</li>
+                                <li>Environment</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <h6>CSV2 Agent/Software Columns:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul>
+                                <li>ServerName</li>
+                                <li>ServerIP</li>
                                 <li>OperatingSystem</li>
-                                <li>OperatingSystemVersion</li>
+                                <li>OSVersion (Build)</li>
                                 <li>LastBootTime</li>
-                                <li>LocalAdmins</li>
                                 <li>OSDiskSize</li>
                                 <li>OSDiskFree</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul>
+                                <li>CynetLauncher</li>
+                                <li>Wincollect</li>
+                                <li>S1Agent</li>
+                                <li>S1SelfProtection</li>
+                                <li>S1MonitorBuildId</li>
+                                <li>S1MgmtServer</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <h6>General Server Columns:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul>
+                                <li>ManagementIP (or "ServerIP (mgt)")</li>
+                                <li>OperatingSystemVersion</li>
+                                <li>LocalAdmins</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul>
                                 <li>ServiceOwner</li>
                                 <li>MaintenanceWindows</li>
+                                <li>Build</li>
                             </ul>
                         </div>
                     </div>
@@ -185,6 +223,66 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        }
+        
+        <!-- Import Results Footer -->
+        @if (Model.HasResults)
+        {
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i> Import Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Import Details</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>File:</strong> @Model.FileName</li>
+                                <li><strong>Exit Code:</strong> 
+                                    @if (Model.ExitCode == 0)
+                                    {
+                                        <span class="badge bg-success">0 (Success)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">@Model.ExitCode (Error)</span>
+                                    }
+                                </li>
+                                @if (Model.ProcessingDuration.HasValue)
+                                {
+                                    <li><strong>Processing Time:</strong> @Model.ProcessingDuration.Value.TotalSeconds.ToString("F1") seconds</li>
+                                }
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Processing Results</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Total Records Processed:</strong> @Model.TotalRecordsProcessed</li>
+                                <li><strong>New Servers:</strong> <span class="text-success">@Model.ImportedCount</span></li>
+                                <li><strong>Updated Servers:</strong> <span class="text-info">@Model.UpdatedCount</span></li>
+                                <li><strong>Conflicts:</strong> <span class="text-warning">@Model.ConflictCount</span></li>
+                                <li><strong>Errors:</strong> <span class="text-danger">@Model.ErrorCount</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                    @if (Model.ImportStartTime.HasValue)
+                    {
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <small class="text-muted">
+                                    Import started: @Model.ImportStartTime.Value.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                                    @if (Model.ImportEndTime.HasValue)
+                                    {
+                                        <span> | Completed: @Model.ImportEndTime.Value.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+                                    }
+                                </small>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         }

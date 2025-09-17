@@ -46,18 +46,30 @@ namespace CveWebApp.Controllers
             try
             {
                 var importResult = await ProcessCsvFileAsync(csvFile);
+                importResult.FileName = csvFile.FileName;
+                importResult.ExitCode = importResult.IsSuccessful ? 0 : 1;
                 return View("ImportResult", importResult);
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError("", $"Error processing file: {ex.Message}");
-                return View("Index");
+                var errorResult = new KbImportResult
+                {
+                    FileName = csvFile.FileName,
+                    ExitCode = 1,
+                    ImportStartTime = DateTime.UtcNow,
+                    ImportEndTime = DateTime.UtcNow
+                };
+                errorResult.Errors.Add($"Error processing file: {ex.Message}");
+                return View("ImportResult", errorResult);
             }
         }
 
         private async Task<KbImportResult> ProcessCsvFileAsync(IFormFile csvFile)
         {
-            var result = new KbImportResult();
+            var result = new KbImportResult
+            {
+                ImportStartTime = DateTime.UtcNow
+            };
             var serversToUpdate = new HashSet<string>();
             var newKbRecords = new List<ServerInstalledKb>();
 
@@ -162,6 +174,8 @@ namespace CveWebApp.Controllers
 
             // Save changes
             await _context.SaveChangesAsync();
+            
+            result.ImportEndTime = DateTime.UtcNow;
 
             return result;
         }
@@ -241,5 +255,16 @@ namespace CveWebApp.Controllers
         public List<string> Errors { get; set; } = new List<string>();
         public bool HasErrors => Errors.Count > 0;
         public bool IsSuccessful => LinesProcessed > 0 && !HasErrors;
+        
+        // Progress tracking fields
+        public string? FileName { get; set; }
+        public int ExitCode { get; set; }
+        public DateTime? ImportStartTime { get; set; }
+        public DateTime? ImportEndTime { get; set; }
+        public int ErrorCount => Errors.Count;
+        
+        public TimeSpan? ProcessingDuration => ImportStartTime.HasValue && ImportEndTime.HasValue 
+            ? ImportEndTime.Value - ImportStartTime.Value 
+            : null;
     }
 }
