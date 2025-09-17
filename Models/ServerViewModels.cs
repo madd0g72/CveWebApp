@@ -74,6 +74,17 @@ namespace CveWebApp.Models
         public int ImportedCount { get; set; }
         public int UpdatedCount { get; set; }
         public int ConflictCount { get; set; }
+        public string? FileName { get; set; }
+        public int ExitCode { get; set; }
+        public DateTime? ImportStartTime { get; set; }
+        public DateTime? ImportEndTime { get; set; }
+        public int TotalRecordsProcessed { get; set; }
+        public int ErrorCount { get; set; }
+        
+        public bool HasResults => ImportedCount > 0 || UpdatedCount > 0 || ErrorCount > 0;
+        public TimeSpan? ProcessingDuration => ImportStartTime.HasValue && ImportEndTime.HasValue 
+            ? ImportEndTime.Value - ImportStartTime.Value 
+            : null;
     }
 
     /// <summary>

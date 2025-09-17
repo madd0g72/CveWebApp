@@ -152,17 +152,23 @@ namespace CveWebApp.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Import(IFormFile csvFile)
         {
-            var viewModel = new ServerImportViewModel();
+            var viewModel = new ServerImportViewModel
+            {
+                ImportStartTime = DateTime.UtcNow,
+                FileName = csvFile?.FileName
+            };
 
             if (csvFile == null || csvFile.Length == 0)
             {
                 viewModel.ErrorMessage = "Please select a CSV file to upload.";
+                viewModel.ExitCode = 1;
                 return View(viewModel);
             }
 
             if (!csvFile.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
             {
                 viewModel.ErrorMessage = "Please upload a CSV file.";
+                viewModel.ExitCode = 1;
                 return View(viewModel);
             }
 
@@ -180,10 +186,16 @@ namespace CveWebApp.Controllers
 
                 var headers = ParseCsvLine(lines[0]);
                 var serverNameIndex = FindColumnIndex(headers, "ServerName");
+                
+                // Also check for "VM" column (CSV1 format)
+                if (serverNameIndex == -1)
+                {
+                    serverNameIndex = FindColumnIndex(headers, "VM");
+                }
 
                 if (serverNameIndex == -1)
                 {
-                    viewModel.ErrorMessage = "CSV file must contain a 'ServerName' column.";
+                    viewModel.ErrorMessage = "CSV file must contain a 'ServerName' or 'VM' column.";
                     return View(viewModel);
                 }
 
@@ -227,6 +239,10 @@ namespace CveWebApp.Controllers
                 viewModel.Conflicts = conflicts;
                 viewModel.ConflictCount = conflicts.Count;
                 viewModel.Warnings = errors;
+                viewModel.ErrorCount = errors.Count;
+                viewModel.TotalRecordsProcessed = importedCount + updatedCount;
+                viewModel.ImportEndTime = DateTime.UtcNow;
+                viewModel.ExitCode = errors.Any() ? 1 : 0;
 
                 if (conflicts.Any())
                 {
@@ -250,6 +266,9 @@ namespace CveWebApp.Controllers
             catch (Exception ex)
             {
                 viewModel.ErrorMessage = $"Error processing CSV file: {ex.Message}";
+                viewModel.ImportEndTime = DateTime.UtcNow;
+                viewModel.ExitCode = 1;
+                viewModel.ErrorCount = 1;
                 _logger.LogError(ex, "Error importing server CSV file");
             }
 
@@ -381,6 +400,16 @@ namespace CveWebApp.Controllers
                     case "cluster":
                         server.Cluster = value;
                         break;
+                    case "vm":
+                    case "servername":
+                        // Server name is handled separately, but we can update it here if needed
+                        if (string.IsNullOrEmpty(server.ServerName))
+                            server.ServerName = value;
+                        break;
+                    case "os":
+                    case "operatingsystem":
+                        server.OperatingSystem = value;
+                        break;
                     case "project":
                         server.Project = value;
                         break;
@@ -396,9 +425,6 @@ namespace CveWebApp.Controllers
                     case "managementip":
                     case "serverip (mgt)":
                         server.ManagementIP = value;
-                        break;
-                    case "operatingsystem":
-                        server.OperatingSystem = value;
                         break;
                     case "operatingsystemversion":
                         server.OperatingSystemVersion = value;
@@ -419,10 +445,46 @@ namespace CveWebApp.Controllers
                             server.OSDiskFree = diskFree;
                         break;
                     case "serviceowner":
+                    case "service_owner":
                         server.ServiceOwner = value;
                         break;
                     case "maintenancewindows":
                         server.MaintenanceWindows = value;
+                        break;
+                    case "status":
+                        server.Status = value;
+                        break;
+                    case "build":
+                    case "osversion":
+                        server.Build = value;
+                        break;
+                    case "cynetlauncher":
+                    case "wincollect":
+                    case "s1agent":
+                    case "s1selfprotection":
+                    case "s1monitorbuildid":
+                    case "s1mgmtserver":
+                        // Append service info to Services field
+                        var serviceName = header.ToLower() switch
+                        {
+                            "cynetlauncher" => "CynetLauncher",
+                            "wincollect" => "Wincollect",
+                            "s1agent" => "S1Agent",
+                            "s1selfprotection" => "S1SelfProtection",
+                            "s1monitorbuildid" => "S1MonitorBuildId",
+                            "s1mgmtserver" => "S1MgmtServer",
+                            _ => header
+                        };
+                        
+                        if (!string.IsNullOrEmpty(server.Services))
+                        {
+                            if (!server.Services.Contains(serviceName))
+                                server.Services += $"; {serviceName}: {value}";
+                        }
+                        else
+                        {
+                            server.Services = $"{serviceName}: {value}";
+                        }
                         break;
                 }
             }
