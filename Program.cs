@@ -15,10 +15,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Register the CSV data loader service
-builder.Services.AddScoped<CsvDataLoader>();
-builder.Services.AddScoped<TestSupersedenceService>();
-
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
 if (string.IsNullOrEmpty(dbProvider))
@@ -155,12 +151,10 @@ using (var scope = app.Services.CreateScope())
     {
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        var csvDataLoader = scope.ServiceProvider.GetRequiredService<CsvDataLoader>();
-        var testSupersedenceService = scope.ServiceProvider.GetRequiredService<TestSupersedenceService>();
 
         await SeedRolesAndUsersAsync(userManager, roleManager);
-        await SeedRealDataAsync(context, csvDataLoader, app.Environment);
-        await testSupersedenceService.AddTestSupersedenceServerAsync();
+        // Removed automatic CSV data loading and test data seeding
+        // All data population must now happen via admin import functionality
     }
 }
 
@@ -238,71 +232,4 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
             await userManager.AddToRoleAsync(testUser, "User");
         }
     }
-}
-
-async Task SeedRealDataAsync(ApplicationDbContext context, CsvDataLoader csvDataLoader, IWebHostEnvironment environment)
-{
-    // Only load real data in development if no data exists yet
-    if (await context.CveUpdateStagings.AnyAsync())
-        return;
-
-    var dataPath = Path.Combine(environment.ContentRootPath, "Data");
-    var msrcCsvPath = Path.Combine(dataPath, "MSRC_SecurityUpdates_2025_v3.csv");
-    var wsusCsvPath = Path.Combine(dataPath, "WSUS_InstalledKBs.csv");
-
-    try
-    {
-        // Load MSRC security updates data
-        await csvDataLoader.LoadMsrcSecurityUpdatesAsync(msrcCsvPath);
-        
-        // Load WSUS installed KBs data
-        await csvDataLoader.LoadWsusInstalledKbsAsync(wsusCsvPath);
-        
-        // Process supersedence relationships from the loaded data
-        await csvDataLoader.ProcessSupersedenceRelationshipsAsync();
-    }
-    catch (Exception ex)
-    {
-        // Log error but don't fail the application startup
-        Console.WriteLine($"Error loading CSV data: {ex.Message}");
-        
-        // Fall back to minimal test data if CSV loading fails
-        await SeedMinimalTestDataAsync(context);
-    }
-}
-
-async Task SeedMinimalTestDataAsync(ApplicationDbContext context)
-{
-    // Minimal fallback data in case CSV loading fails
-    var fallbackCveRecord = new CveUpdateStaging
-    {
-        ReleaseDate = DateTime.Now.AddDays(-30),
-        ProductFamily = "Windows",
-        Product = "Windows Server 2016",
-        Platform = "x64",
-        Impact = "Critical",
-        MaxSeverity = "Critical",
-        Article = "KB5058383",
-        Details = "CVE-2025-29833",
-        BaseScore = 7.7m,
-        CustomerActionRequired = true,
-        Supercedence = "5055521"
-    };
-
-    context.CveUpdateStagings.Add(fallbackCveRecord);
-
-    // Add our test server
-    var fallbackServerData = new List<ServerInstalledKb>
-    {
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "4052623" },
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5065427" },
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "2267602" },
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5012170" },
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "925673" },
-        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5065687" }
-    };
-
-    context.ServerInstalledKbs.AddRange(fallbackServerData);
-
-    await context.SaveChangesAsync();
 }
