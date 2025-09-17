@@ -17,6 +17,7 @@ builder.Services.AddControllersWithViews();
 
 // Register the CSV data loader service
 builder.Services.AddScoped<CsvDataLoader>();
+builder.Services.AddScoped<TestSupersedenceService>();
 
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
@@ -155,9 +156,11 @@ using (var scope = app.Services.CreateScope())
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var csvDataLoader = scope.ServiceProvider.GetRequiredService<CsvDataLoader>();
+        var testSupersedenceService = scope.ServiceProvider.GetRequiredService<TestSupersedenceService>();
 
         await SeedRolesAndUsersAsync(userManager, roleManager);
         await SeedRealDataAsync(context, csvDataLoader, app.Environment);
+        await testSupersedenceService.AddTestSupersedenceServerAsync();
     }
 }
 
