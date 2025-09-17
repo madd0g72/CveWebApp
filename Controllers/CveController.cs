@@ -716,6 +716,7 @@ namespace CveWebApp.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Import(IFormFile csvFile)
         {
+            var startTime = DateTime.UtcNow;
             var currentUser = User.Identity?.Name ?? "Anonymous";
             var sourceIP = GetClientIpAddress();
 
@@ -728,12 +729,16 @@ namespace CveWebApp.Controllers
                     sourceIP);
                 
                 ModelState.AddModelError("", "Please select a CSV file to upload.");
+                ViewBag.ExitCode = 1;
+                ViewBag.FileName = "";
                 return View();
             }
 
             if (!csvFile.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
             {
                 ModelState.AddModelError("", "Please upload a CSV file with .csv extension.");
+                ViewBag.ExitCode = 1;
+                ViewBag.FileName = csvFile.FileName;
                 return View();
             }
 
@@ -741,8 +746,13 @@ namespace CveWebApp.Controllers
             if (csvFile.Length > 10 * 1024 * 1024)
             {
                 ModelState.AddModelError("", "File size cannot exceed 10MB.");
+                ViewBag.ExitCode = 1;
+                ViewBag.FileName = csvFile.FileName;
                 return View();
             }
+
+            ViewBag.FileName = csvFile.FileName;
+            ViewBag.ImportStartTime = startTime;
 
             try
             {
@@ -803,6 +813,14 @@ namespace CveWebApp.Controllers
                 {
                     await _context.SaveChangesAsync();
                     
+                    var endTime = DateTime.UtcNow;
+                    ViewBag.ImportEndTime = endTime;
+                    ViewBag.ProcessingDuration = (endTime - startTime).TotalSeconds;
+                    ViewBag.TotalRecordsProcessed = importedCount;
+                    ViewBag.ImportedCount = importedCount;
+                    ViewBag.ErrorCount = errors.Count;
+                    ViewBag.ExitCode = 0;
+                    
                     // Process supersedence data after successful import
                     try
                     {
@@ -832,6 +850,14 @@ namespace CveWebApp.Controllers
                 }
                 else if (errors.Count >= 10)
                 {
+                    var endTime = DateTime.UtcNow;
+                    ViewBag.ImportEndTime = endTime;
+                    ViewBag.ProcessingDuration = (endTime - startTime).TotalSeconds;
+                    ViewBag.TotalRecordsProcessed = 0;
+                    ViewBag.ImportedCount = 0;
+                    ViewBag.ErrorCount = errors.Count;
+                    ViewBag.ExitCode = 1;
+                    
                     ViewBag.ErrorMessage = $"Import failed: Too many errors ({errors.Count}). Please check your CSV file format and fix the issues.";
                     ViewBag.Errors = errors.Take(10).ToList(); // Show first 10 errors
                     
@@ -844,6 +870,14 @@ namespace CveWebApp.Controllers
                 }
                 else if (importedCount == 0)
                 {
+                    var endTime = DateTime.UtcNow;
+                    ViewBag.ImportEndTime = endTime;
+                    ViewBag.ProcessingDuration = (endTime - startTime).TotalSeconds;
+                    ViewBag.TotalRecordsProcessed = 0;
+                    ViewBag.ImportedCount = 0;
+                    ViewBag.ErrorCount = errors.Count;
+                    ViewBag.ExitCode = 1;
+                    
                     ViewBag.ErrorMessage = "No valid records found to import. Please check your CSV file format.";
                     if (errors.Count > 0)
                     {
@@ -853,6 +887,14 @@ namespace CveWebApp.Controllers
             }
             catch (Exception ex)
             {
+                var endTime = DateTime.UtcNow;
+                ViewBag.ImportEndTime = endTime;
+                ViewBag.ProcessingDuration = (endTime - startTime).TotalSeconds;
+                ViewBag.TotalRecordsProcessed = 0;
+                ViewBag.ImportedCount = 0;
+                ViewBag.ErrorCount = 1;
+                ViewBag.ExitCode = 1;
+                
                 await _fileLoggingService.LogErrorAsync(
                     $"Error during CVE import: {ex.Message}", 
                     currentUser, 
