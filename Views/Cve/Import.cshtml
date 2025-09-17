@@ -136,7 +136,7 @@
                                 </li>
                                 @if (ViewBag.ProcessingDuration != null)
                                 {
-                                    <li><strong>Processing Time:</strong> @((double)ViewBag.ProcessingDuration).ToString("F1") seconds</li>
+                                    <li><strong>Processing Time:</strong> @(((double)ViewBag.ProcessingDuration).ToString("F1")) seconds</li>
                                 }
                             </ul>
                         </div>
@@ -154,10 +154,10 @@
                         <div class="row mt-3">
                             <div class="col-12">
                                 <small class="text-muted">
-                                    Import started: @((DateTime)ViewBag.ImportStartTime).ToString("yyyy-MM-dd HH:mm:ss") UTC
+                                    Import started: @(((DateTime)ViewBag.ImportStartTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC
                                     @if (ViewBag.ImportEndTime != null)
                                     {
-                                        <span> | Completed: @((DateTime)ViewBag.ImportEndTime).ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+                                        <span> | Completed: @(((DateTime)ViewBag.ImportEndTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC</span>
                                     }
                                 </small>
                             </div>
