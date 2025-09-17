@@ -39,15 +39,27 @@
                     </div>
                 </form>
                 
-                @* Development/Testing credentials info - Commented out for production
-                <div class="mt-4 p-3 bg-light rounded">
-                    <h6>Demo Credentials</h6>
-                    <small class="text-muted">
-                        <strong>Admin:</strong> admin@cveapp.local / admin123<br>
-                        <strong>User:</strong> user@cveapp.local / user123
-                    </small>
-                </div>
-                *@
+                @* Show credentials info based on environment *@
+                @if (Context.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+                {
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6>Development Demo Credentials</h6>
+                        <small class="text-muted">
+                            <strong>Admin:</strong> admin@cveapp.local / admin123<br>
+                            <strong>User:</strong> user@cveapp.local / user123
+                        </small>
+                    </div>
+                }
+                else
+                {
+                    <div class="mt-4 p-3 bg-warning bg-opacity-25 rounded">
+                        <h6 class="text-warning">Production Environment</h6>
+                        <small class="text-muted">
+                            <strong>Default Admin:</strong> admin@company.local<br>
+                            <em>Use "Forgot Password" to reset if needed</em>
+                        </small>
+                    </div>
+                }
             </div>
         </div>
     </div>

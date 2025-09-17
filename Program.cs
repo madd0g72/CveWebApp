@@ -99,11 +99,26 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Add Identity services
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 4;
+    // Environment-specific password policies
+    if (builder.Environment.IsDevelopment())
+    {
+        // Relaxed policies for development
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequiredLength = 4;
+    }
+    else
+    {
+        // Secure policies for production
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequiredLength = 8;
+    }
+    
     options.User.RequireUniqueEmail = true;
     options.SignIn.RequireConfirmedEmail = false;
 })
@@ -188,12 +203,14 @@ using (var scope = app.Services.CreateScope())
         await context.Database.EnsureCreatedAsync();
     }
 
+    // Always seed roles and admin user in all environments
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+    await SeedRolesAndUsersAsync(userManager, roleManager);
+    
     if (app.Environment.IsDevelopment())
     {
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-
-        await SeedRolesAndUsersAsync(userManager, roleManager);
         // Removed automatic CSV data loading and test data seeding
         // All data population must now happen via admin import functionality
     }
@@ -221,7 +238,7 @@ app.MapControllerRoute(
 app.Run();
 
 /// <summary>
-/// Seeds application roles and creates default admin user for testing/development
+/// Seeds application roles and creates default admin user for all environments
 /// </summary>
 async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
 {
@@ -234,7 +251,8 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
         }
     }
 
-    var adminEmail = "admin@cveapp.local";
+    // Create default admin user for all environments
+    var adminEmail = app.Environment.IsDevelopment() ? "admin@cveapp.local" : "admin@company.local";
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
     if (adminUser == null)
@@ -244,33 +262,46 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
             UserName = adminEmail,
             Email = adminEmail,
             EmailConfirmed = true,
-            FullName = "System Administrator"
+            FullName = app.Environment.IsDevelopment() ? "System Administrator" : "Production Administrator"
         };
 
-        var result = await userManager.CreateAsync(adminUser, "admin123");
+        // Use different default passwords for different environments
+        var adminPassword = app.Environment.IsDevelopment() ? "admin123" : "AdminPass1!";
+        var result = await userManager.CreateAsync(adminUser, adminPassword);
         if (result.Succeeded)
         {
             await userManager.AddToRoleAsync(adminUser, "Admin");
+            
+            // Log admin creation for production environments
+            if (!app.Environment.IsDevelopment())
+            {
+                var logger = app.Services.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning("Default admin user created: {AdminEmail}. Please change the password immediately!", adminEmail);
+            }
         }
     }
 
-    var userEmail = "user@cveapp.local";
-    var testUser = await userManager.FindByEmailAsync(userEmail);
-
-    if (testUser == null)
+    // Only create test user in development
+    if (app.Environment.IsDevelopment())
     {
-        testUser = new ApplicationUser
-        {
-            UserName = userEmail,
-            Email = userEmail,
-            EmailConfirmed = true,
-            FullName = "Test User"
-        };
+        var userEmail = "user@cveapp.local";
+        var testUser = await userManager.FindByEmailAsync(userEmail);
 
-        var result = await userManager.CreateAsync(testUser, "user123");
-        if (result.Succeeded)
+        if (testUser == null)
         {
-            await userManager.AddToRoleAsync(testUser, "User");
+            testUser = new ApplicationUser
+            {
+                UserName = userEmail,
+                Email = userEmail,
+                EmailConfirmed = true,
+                FullName = "Test User"
+            };
+
+            var result = await userManager.CreateAsync(testUser, "user123");
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(testUser, "User");
+            }
         }
     }
 }
