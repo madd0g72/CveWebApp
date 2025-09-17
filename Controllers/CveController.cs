@@ -167,7 +167,11 @@ namespace CveWebApp.Controllers
                 var document = CreateCompliancePdfDocument(viewModel);
                 var pdfBytes = document.GeneratePdf();
                 
-                var fileName = $"CVE_Compliance_Report_{cveDetails.Id}_{DateTime.Now:yyyyMMdd}.pdf";
+                // Format: CVENUMBER_ComplianceReport_DATE.pdf
+                var cveNumber = !string.IsNullOrWhiteSpace(cveDetails.Details) 
+                    ? SanitizeFilename(cveDetails.Details) 
+                    : $"CVE{cveDetails.Id}";
+                var fileName = $"{cveNumber}_ComplianceReport_{DateTime.Now:yyyyMMdd}.pdf";
                 return File(pdfBytes, "application/pdf", fileName);
             }
             catch (Exception ex)
@@ -203,7 +207,11 @@ namespace CveWebApp.Controllers
                 var csvContent = CreateComplianceCsvContent(viewModel);
                 var csvBytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
                 
-                var fileName = $"CVE_Compliance_Report_{cveDetails.Id}_{DateTime.Now:yyyyMMdd}.csv";
+                // Format: CVENUMBER_ComplianceReport_DATE.csv
+                var cveNumber = !string.IsNullOrWhiteSpace(cveDetails.Details) 
+                    ? SanitizeFilename(cveDetails.Details) 
+                    : $"CVE{cveDetails.Id}";
+                var fileName = $"{cveNumber}_ComplianceReport_{DateTime.Now:yyyyMMdd}.csv";
                 return File(csvBytes, "text/csv", fileName);
             }
             catch (Exception ex)
@@ -1186,6 +1194,33 @@ namespace CveWebApp.Controllers
             }
 
             return null; // No superseding KB found
+        }
+
+        /// <summary>
+        /// Sanitizes a string to be safe for use in filenames by removing or replacing invalid characters
+        /// </summary>
+        /// <param name="input">The input string to sanitize</param>
+        /// <returns>A filename-safe string</returns>
+        private static string SanitizeFilename(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return "Unknown";
+
+            // Remove or replace characters that are not allowed in filenames
+            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+            var sanitized = input;
+            
+            foreach (var invalidChar in invalidChars)
+            {
+                sanitized = sanitized.Replace(invalidChar, '_');
+            }
+            
+            // Also replace some additional characters that might cause issues
+            sanitized = sanitized.Replace(' ', '_').Replace(':', '_').Replace('.', '_');
+            
+            // Trim and ensure it's not empty
+            sanitized = sanitized.Trim('_');
+            return string.IsNullOrEmpty(sanitized) ? "Unknown" : sanitized;
         }
 
     }
