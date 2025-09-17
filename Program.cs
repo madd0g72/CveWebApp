@@ -103,28 +103,41 @@ using (var scope = app.Services.CreateScope())
         var canConnect = await context.Database.CanConnectAsync();
         if (canConnect)
         {
-            // Check if any tables exist (specifically look for AspNetUsers as it's always created)
+            // Check if any tables exist (look for AspNetUsers as it's always created)
             var hasSchema = await context.Database.GetService<IRelationalDatabaseCreator>().HasTablesAsync();
             
             if (!hasSchema)
             {
-                // Database exists but is empty - create schema
+                // Database exists but is empty - create schema using EnsureCreated for cross-provider compatibility
                 await context.Database.EnsureCreatedAsync();
             }
             else
             {
-                // Database has tables - apply pending migrations only
-                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-                if (pendingMigrations.Any())
+                // Database has tables - apply pending migrations only if using MySQL (migrations are MySQL-specific)
+                if (currentProvider != null && currentProvider.Contains("MySql"))
                 {
-                    await context.Database.MigrateAsync();
+                    var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                    if (pendingMigrations.Any())
+                    {
+                        await context.Database.MigrateAsync();
+                    }
                 }
+                // For SQL Server with existing schema, skip migrations as they contain MySQL-specific code
             }
         }
         else
         {
-            // Database doesn't exist - create it and apply migrations
-            await context.Database.MigrateAsync();
+            // Database doesn't exist - create it
+            if (currentProvider != null && currentProvider.Contains("MySql"))
+            {
+                // For MySQL, use migrations
+                await context.Database.MigrateAsync();
+            }
+            else
+            {
+                // For SQL Server, use EnsureCreated to avoid MySQL-specific migration issues
+                await context.Database.EnsureCreatedAsync();
+            }
         }
     }
     else
