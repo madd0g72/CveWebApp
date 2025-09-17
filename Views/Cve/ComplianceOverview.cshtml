@@ -123,6 +123,7 @@
                             <th>Status</th>
                             <th>Installed KBs</th>
                             <th>Missing KBs</th>
+                            <th>Supersedence Info</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -184,6 +185,25 @@
                                     else
                                     {
                                         <span class="text-success">None</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (server.SupersedenceNotes.Any())
+                                    {
+                                        @foreach (var note in server.SupersedenceNotes)
+                                        {
+                                            <div class="small text-info mb-1">
+                                                <i class="bi bi-info-circle"></i> @note
+                                            </div>
+                                        }
+                                    }
+                                    else if (server.IsCompliant && Model.RequiredKbs.Any())
+                                    {
+                                        <span class="text-muted small">Direct KB match</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
                                     }
                                 </td>
                             </tr>
