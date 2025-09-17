@@ -237,137 +237,317 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
     if (await context.CveUpdateStagings.AnyAsync())
         return;
 
-    var testCveRecords = new List<CveUpdateStaging>
+    try
     {
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-30),
-            ProductFamily = "Windows",
-            Product = "Windows 10",
-            Platform = "x64",
-            Impact = "Critical",
-            MaxSeverity = "Critical",
-            Article = "KB5001234",
-            Details = "CVE-2024-12345, CVE-2024-54321",
-            BaseScore = 9.8m,
-            CustomerActionRequired = true
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-15),
-            ProductFamily = "Windows",
-            Product = "Windows 11",
-            Platform = "x64",
-            Impact = "High",
-            MaxSeverity = "High",
-            Article = "KB5002345",
-            Details = "CVE-2024-99999",
-            BaseScore = 7.5m,
-            CustomerActionRequired = false
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-7),
-            ProductFamily = "Office",
-            Product = "Microsoft Office 2019",
-            Platform = "x86",
-            Impact = "Medium",
-            MaxSeverity = "Medium",
-            Article = "KB5003456",
-            Details = "CVE-2024-11111, CVE-2024-22222",
-            BaseScore = 5.2m,
-            CustomerActionRequired = true
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-45),
-            ProductFamily = "Windows",
-            Product = "Windows Server 2019",
-            Platform = "x64",
-            Impact = "Low",
-            MaxSeverity = "Low",
-            Article = "KB5004567",
-            Details = "CVE-2024-88888",
-            BaseScore = 3.1m,
-            CustomerActionRequired = false
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-60),
-            ProductFamily = "Office",
-            Product = "Microsoft Office 2021",
-            Platform = "x64",
-            Impact = "High",
-            MaxSeverity = "High",
-            Article = "KB5005678",
-            Details = "CVE-2024-77777",
-            BaseScore = 8.2m,
-            CustomerActionRequired = true
-        }
-    };
-
-    context.CveUpdateStagings.AddRange(testCveRecords);
-
-    // Add some test server data to demonstrate actual compliance calculations
-    var testServerData = new List<ServerInstalledKb>
+        // Load real CVE data from CSV file
+        await LoadCveDataFromCsvAsync(context);
+        
+        // Load real server KB data from CSV file
+        await LoadServerKbDataFromCsvAsync(context);
+        
+        // Process and build supersedence relationships from real data
+        await ProcessSupersedenceDataFromCsvAsync(context);
+        
+        await context.SaveChangesAsync();
+    }
+    catch (Exception ex)
     {
-        // Windows 10 servers with some KBs installed
-        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5001234" },
-        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5000123" },
-        new ServerInstalledKb { Computer = "WIN10-SRV-02", OSProduct = "Windows 10 Pro", KB = "5000456" },
-        
-        // Windows 11 servers
-        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5002345" },
-        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5001000" },
-        new ServerInstalledKb { Computer = "WIN11-SRV-02", OSProduct = "Windows 11 Pro", KB = "5001001" },
-        
-        // Office servers
-        new ServerInstalledKb { Computer = "OFFICE-SRV-01", OSProduct = "Microsoft Office 2019", KB = "5003456" },
-        new ServerInstalledKb { Computer = "OFFICE-SRV-02", OSProduct = "Microsoft Office 2019", KB = "5003000" },
-        
-        // Windows Server 2019
-        new ServerInstalledKb { Computer = "WS2019-SRV-01", OSProduct = "Windows Server 2019", KB = "5004567" },
-        new ServerInstalledKb { Computer = "WS2019-SRV-02", OSProduct = "Windows Server 2019", KB = "5004567" },
-        
-        // Office 2021 servers
-        new ServerInstalledKb { Computer = "O365-SRV-01", OSProduct = "Microsoft Office 2021", KB = "5005678" },
-        new ServerInstalledKb { Computer = "O365-SRV-02", OSProduct = "Microsoft Office 2021", KB = "5005000" }
-    };
+        // If loading real data fails, fall back to minimal test data for development
+        Console.WriteLine($"Failed to load real CSV data: {ex.Message}. Using minimal test data.");
+        await LoadMinimalTestDataAsync(context);
+    }
+}
 
-    context.ServerInstalledKbs.AddRange(testServerData);
+async Task LoadCveDataFromCsvAsync(ApplicationDbContext context)
+{
+    var csvPath = Path.Combine("Data", "MSRC_SecurityUpdates_2025_v3.csv");
+    if (!File.Exists(csvPath))
+        throw new FileNotFoundException($"CVE CSV file not found: {csvPath}");
+
+    var lines = await File.ReadAllLinesAsync(csvPath);
+    if (lines.Length < 2) return; // No data to process
     
-    // Add test supersedence data to demonstrate the functionality
-    var testSupersedenceData = new List<KbSupersedence>
+    var records = new List<CveUpdateStaging>();
+    var headers = lines[0].Split(',');
+    
+    for (int i = 1; i < lines.Length; i++)
     {
-        // KB5000456 supersedes KB5001234 (this will make WIN10-SRV-02 compliant)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5001234", 
-            SupersedingKb = "KB5000456", 
-            Product = "Windows 10", 
-            ProductFamily = "Windows",
-            DateAdded = DateTime.UtcNow 
-        },
-        // KB5003000 supersedes KB5003456 (for Office scenarios)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5003456", 
-            SupersedingKb = "KB5003000", 
-            Product = "Microsoft Office 2019", 
-            ProductFamily = "Office",
-            DateAdded = DateTime.UtcNow 
-        },
-        // KB5002345 supersedes KB5002000 (for Windows 11 scenarios)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5002000", 
-            SupersedingKb = "KB5002345", 
-            Product = "Windows 11", 
-            ProductFamily = "Windows",
-            DateAdded = DateTime.UtcNow 
+        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+        
+        try
+        {
+            var values = ParseCsvLine(lines[i]);
+            if (values.Length != headers.Length) continue;
+            
+            var record = new CveUpdateStaging();
+            
+            for (int j = 0; j < headers.Length; j++)
+            {
+                var header = headers[j].Trim().ToLowerInvariant();
+                var value = values[j].Trim();
+                
+                switch (header)
+                {
+                    case "release date":
+                        if (DateTime.TryParse(value, out var date))
+                            record.ReleaseDate = date;
+                        break;
+                    case "product family":
+                        record.ProductFamily = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "product":
+                        record.Product = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "platform":
+                        record.Platform = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "impact":
+                        record.Impact = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "max severity":
+                        record.MaxSeverity = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "article":
+                        record.Article = string.IsNullOrEmpty(value) ? null : $"KB{value}";
+                        break;
+                    case "article (link)":
+                        record.ArticleLink = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "supercedence":
+                        record.Supercedence = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "download":
+                        record.Download = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "download (link)":
+                        record.DownloadLink = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "build number":
+                        record.BuildNumber = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "details":
+                        record.Details = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "details (link)":
+                        record.DetailsLink = string.IsNullOrEmpty(value) ? null : value;
+                        break;
+                    case "base score":
+                        if (decimal.TryParse(value, out var baseScore))
+                            record.BaseScore = baseScore;
+                        break;
+                    case "temporal score":
+                        if (decimal.TryParse(value, out var tempScore))
+                            record.TemporalScore = tempScore;
+                        break;
+                    case "customer action required":
+                        if (bool.TryParse(value, out var required))
+                            record.CustomerActionRequired = required;
+                        break;
+                }
+            }
+            
+            records.Add(record);
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing CVE line {i + 1}: {ex.Message}");
+        }
+    }
+    
+    if (records.Count > 0)
+    {
+        context.CveUpdateStagings.AddRange(records);
+        Console.WriteLine($"Loaded {records.Count} CVE records from real data");
+    }
+}
+
+async Task LoadServerKbDataFromCsvAsync(ApplicationDbContext context)
+{
+    var csvPath = Path.Combine("Data", "WSUS_InstalledKBs.csv");
+    if (!File.Exists(csvPath))
+        throw new FileNotFoundException($"Server KB CSV file not found: {csvPath}");
+
+    var lines = await File.ReadAllLinesAsync(csvPath);
+    if (lines.Length < 2) return; // No data to process
+    
+    var records = new List<ServerInstalledKb>();
+    
+    for (int i = 1; i < lines.Length; i++) // Skip header
+    {
+        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+        
+        try
+        {
+            var values = ParseCsvLine(lines[i]);
+            if (values.Length < 3) continue;
+            
+            var computer = values[0].Trim().Trim('"');
+            var osProduct = values[1].Trim().Trim('"');
+            var installedKbs = values[2].Trim().Trim('"');
+            
+            if (string.IsNullOrEmpty(computer) || string.IsNullOrEmpty(osProduct)) continue;
+            
+            // Parse comma-separated KB numbers
+            if (!string.IsNullOrEmpty(installedKbs))
+            {
+                var kbNumbers = installedKbs.Split(',')
+                    .Select(kb => kb.Trim())
+                    .Where(kb => !string.IsNullOrEmpty(kb));
+                
+                foreach (var kb in kbNumbers)
+                {
+                    records.Add(new ServerInstalledKb
+                    {
+                        Computer = computer,
+                        OSProduct = osProduct,
+                        KB = kb.StartsWith("KB") ? kb : $"KB{kb}"
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing server KB line {i + 1}: {ex.Message}");
+        }
+    }
+    
+    if (records.Count > 0)
+    {
+        context.ServerInstalledKbs.AddRange(records);
+        Console.WriteLine($"Loaded {records.Count} server KB records from real data");
+    }
+}
+
+async Task ProcessSupersedenceDataFromCsvAsync(ApplicationDbContext context)
+{
+    var supersedenceRecords = new List<KbSupersedence>();
+    var processedPairs = new HashSet<string>();
+    
+    // Get all CVE records with supersedence information
+    var cveRecords = await context.CveUpdateStagings
+        .Where(c => !string.IsNullOrEmpty(c.Supercedence))
+        .ToListAsync();
+    
+    foreach (var cveRecord in cveRecords)
+    {
+        if (string.IsNullOrEmpty(cveRecord.Article) || string.IsNullOrEmpty(cveRecord.Supercedence))
+            continue;
+        
+        var currentKb = NormalizeKb(cveRecord.Article);
+        var supersededKb = NormalizeKb(cveRecord.Supercedence);
+        
+        if (string.IsNullOrEmpty(currentKb) || string.IsNullOrEmpty(supersededKb))
+            continue;
+        
+        var pairKey = $"{supersededKb}=>{currentKb}";
+        if (processedPairs.Contains(pairKey))
+            continue;
+        
+        supersedenceRecords.Add(new KbSupersedence
+        {
+            OriginalKb = supersededKb,
+            SupersedingKb = currentKb,
+            Product = cveRecord.Product,
+            ProductFamily = cveRecord.ProductFamily,
+            DateAdded = DateTime.UtcNow
+        });
+        
+        processedPairs.Add(pairKey);
+    }
+    
+    if (supersedenceRecords.Count > 0)
+    {
+        context.KbSupersedences.AddRange(supersedenceRecords);
+        Console.WriteLine($"Created {supersedenceRecords.Count} supersedence relationships from real data");
+    }
+}
+
+async Task LoadMinimalTestDataAsync(ApplicationDbContext context)
+{
+    // Minimal test data focusing on CVE-2025-29833 scenario
+    var testCveRecord = new CveUpdateStaging
+    {
+        ReleaseDate = DateTime.Parse("2025-05-13"),
+        ProductFamily = "Windows",
+        Product = "Windows Server 2016",
+        Platform = "",
+        Impact = "Remote Code Execution",
+        MaxSeverity = "Critical",
+        Article = "KB5058383",
+        Supercedence = "KB5055521",
+        Details = "CVE-2025-29833",
+        BaseScore = 7.7m,
+        CustomerActionRequired = true
     };
     
-    context.KbSupersedences.AddRange(testSupersedenceData);
+    context.CveUpdateStagings.Add(testCveRecord);
+    
+    // Add the specific server from requirements
+    var serverKbs = new List<ServerInstalledKb>
+    {
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB4052623" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB5065427" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB2267602" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB5012170" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB925673" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "KB5065687" }
+    };
+    
+    context.ServerInstalledKbs.AddRange(serverKbs);
+    
+    // Minimal supersedence chain for the test scenario
+    var testSupersedence = new KbSupersedence
+    {
+        OriginalKb = "KB5058383",
+        SupersedingKb = "KB5065427",
+        Product = "Windows Server 2016",
+        ProductFamily = "Windows",
+        DateAdded = DateTime.UtcNow
+    };
+    
+    context.KbSupersedences.Add(testSupersedence);
     await context.SaveChangesAsync();
+}
+
+string[] ParseCsvLine(string line)
+{
+    var result = new List<string>();
+    var inQuotes = false;
+    var currentField = new System.Text.StringBuilder();
+    
+    for (int i = 0; i < line.Length; i++)
+    {
+        char c = line[i];
+        
+        if (c == '"')
+        {
+            inQuotes = !inQuotes;
+        }
+        else if (c == ',' && !inQuotes)
+        {
+            result.Add(currentField.ToString());
+            currentField.Clear();
+        }
+        else
+        {
+            currentField.Append(c);
+        }
+    }
+    
+    result.Add(currentField.ToString());
+    return result.ToArray();
+}
+
+string NormalizeKb(string kb)
+{
+    if (string.IsNullOrEmpty(kb)) return "";
+    
+    kb = kb.Trim();
+    if (kb.StartsWith("KB", StringComparison.OrdinalIgnoreCase))
+        return kb.ToUpper();
+    
+    if (int.TryParse(kb, out _))
+        return $"KB{kb}";
+    
+    return "";
 }

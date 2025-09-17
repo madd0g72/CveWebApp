@@ -123,6 +123,7 @@
                             <th>Status</th>
                             <th>Installed KBs</th>
                             <th>Missing KBs</th>
+                            <th>Compliance Notes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -184,6 +185,39 @@
                                     else
                                     {
                                         <span class="text-success">None</span>
+                                    }
+                                </td>
+                                <td>
+                                    @{
+                                        var supersedenceKbs = server.DetailedComplianceInfo?.Where(c => c.IsCompliant && c.IsSupersedence).ToList() ?? new List<CveWebApp.Models.KbComplianceInfo>();
+                                    }
+                                    @if (supersedenceKbs.Any())
+                                    {
+                                        <div class="small">
+                                            @foreach (var compliance in supersedenceKbs)
+                                            {
+                                                <div class="text-info mb-1">
+                                                    <i class="bi bi-info-circle"></i>
+                                                    <strong>@compliance.RequiredKb</strong> satisfied by <strong>@compliance.InstalledKb</strong>
+                                                    @if (compliance.SupersedenceChain != null && compliance.SupersedenceChain.Count > 2)
+                                                    {
+                                                        <br><span class="text-muted">Chain: @string.Join(" → ", compliance.SupersedenceChain)</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else if (server.IsCompliant && Model.RequiredKbs.Any())
+                                    {
+                                        <div class="small text-success">
+                                            <i class="bi bi-check-circle"></i> Direct KB match
+                                        </div>
+                                    }
+                                    else if (!server.IsCompliant)
+                                    {
+                                        <div class="small text-danger">
+                                            <i class="bi bi-exclamation-triangle"></i> Missing required KBs
+                                        </div>
                                     }
                                 </td>
                             </tr>

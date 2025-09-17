@@ -23,6 +23,7 @@ namespace CveWebApp.Models
         public List<string> InstalledKbs { get; set; } = new();
         public List<string> MissingKbs { get; set; } = new();
         public bool IsCompliant { get; set; }
+        public List<KbComplianceInfo> DetailedComplianceInfo { get; set; } = new();
     }
 
     public class ComplianceSummary

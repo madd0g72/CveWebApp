@@ -214,6 +214,12 @@ namespace CveWebApp.Controllers
                     cveDetails.Product, 
                     cveDetails.ProductFamily);
                 
+                server.DetailedComplianceInfo = await GetDetailedComplianceInfo(
+                    viewModel.RequiredKbs, 
+                    server.InstalledKbs, 
+                    cveDetails.Product, 
+                    cveDetails.ProductFamily);
+                
                 server.IsCompliant = viewModel.RequiredKbs.Count == 0 || server.MissingKbs.Count == 0;
             }
 
@@ -966,7 +972,7 @@ namespace CveWebApp.Controllers
         }
 
         /// <summary>
-        /// Checks if a server is compliant with required KBs considering supersedence
+        /// Checks if a server is compliant with required KBs considering supersedence chains
         /// </summary>
         private async Task<bool> IsServerCompliantWithSupersedence(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
         {
@@ -975,34 +981,8 @@ namespace CveWebApp.Controllers
 
             foreach (var requiredKb in requiredKbs)
             {
-                bool hasRequiredOrSuperseding = false;
-
-                // Check if the exact KB is installed
-                if (installedKbs.Any(installedKb => 
-                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
-                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
-                {
-                    hasRequiredOrSuperseding = true;
-                }
-                else
-                {
-                    // Check if any installed KB supersedes the required KB
-                    var supersedingKbs = await _context.KbSupersedences
-                        .Where(k => k.OriginalKb == requiredKb)
-                        .Where(k => product == null || k.Product == null || k.Product == product)
-                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
-                        .Select(k => k.SupersedingKb)
-                        .ToListAsync();
-
-                    hasRequiredOrSuperseding = supersedingKbs.Any(supersedingKb =>
-                        installedKbs.Any(installedKb =>
-                            installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
-                            installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                            ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase)));
-                }
-
-                if (!hasRequiredOrSuperseding)
+                var complianceInfo = await GetKbComplianceInfo(requiredKb, installedKbs, product, productFamily);
+                if (!complianceInfo.IsCompliant)
                     return false;
             }
 
@@ -1010,7 +990,125 @@ namespace CveWebApp.Controllers
         }
 
         /// <summary>
-        /// Gets the missing KBs for a server considering supersedence
+        /// Gets detailed compliance information for a specific KB, including supersedence chain
+        /// </summary>
+        private async Task<KbComplianceInfo> GetKbComplianceInfo(string requiredKb, List<string> installedKbs, string? product, string? productFamily)
+        {
+            // Check if the exact KB is installed
+            var exactMatch = installedKbs.FirstOrDefault(installedKb => 
+                installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
+                installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase));
+
+            if (exactMatch != null)
+            {
+                return new KbComplianceInfo
+                {
+                    IsCompliant = true,
+                    RequiredKb = requiredKb,
+                    InstalledKb = NormalizeKbName(exactMatch),
+                    IsSupersedence = false
+                };
+            }
+
+            // Check for supersedence chain
+            var supersedenceChain = await FindSupersedenceChain(requiredKb, installedKbs, product, productFamily);
+            if (supersedenceChain != null)
+            {
+                return new KbComplianceInfo
+                {
+                    IsCompliant = true,
+                    RequiredKb = requiredKb,
+                    InstalledKb = supersedenceChain.FinalKb,
+                    IsSupersedence = true,
+                    SupersedenceChain = supersedenceChain.Chain
+                };
+            }
+
+            return new KbComplianceInfo
+            {
+                IsCompliant = false,
+                RequiredKb = requiredKb
+            };
+        }
+
+        /// <summary>
+        /// Finds a supersedence chain from a required KB to any installed KB
+        /// </summary>
+        private async Task<SupersedenceChainResult?> FindSupersedenceChain(string requiredKb, List<string> installedKbs, string? product, string? productFamily, HashSet<string>? visited = null)
+        {
+            if (visited == null)
+                visited = new HashSet<string>();
+
+            // Prevent infinite loops
+            if (visited.Contains(requiredKb))
+                return null;
+
+            visited.Add(requiredKb);
+
+            // Get all KBs that supersede the required KB
+            var supersedingKbs = await _context.KbSupersedences
+                .Where(k => k.OriginalKb == requiredKb)
+                .Where(k => product == null || k.Product == null || k.Product == product)
+                .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
+                .Select(k => k.SupersedingKb)
+                .ToListAsync();
+
+            foreach (var supersedingKb in supersedingKbs)
+            {
+                // Check if this superseding KB is installed
+                var installedMatch = installedKbs.FirstOrDefault(installedKb =>
+                    installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
+                    installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                    ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase));
+
+                if (installedMatch != null)
+                {
+                    return new SupersedenceChainResult
+                    {
+                        FinalKb = NormalizeKbName(installedMatch),
+                        Chain = new List<string> { requiredKb, supersedingKb }
+                    };
+                }
+
+                // Recursively check if the superseding KB is superseded by something that is installed
+                var nestedChain = await FindSupersedenceChain(supersedingKb, installedKbs, product, productFamily, visited);
+                if (nestedChain != null)
+                {
+                    var fullChain = new List<string> { requiredKb };
+                    fullChain.AddRange(nestedChain.Chain);
+                    
+                    return new SupersedenceChainResult
+                    {
+                        FinalKb = nestedChain.FinalKb,
+                        Chain = fullChain
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Normalizes KB names to ensure consistent format
+        /// </summary>
+        private string NormalizeKbName(string kb)
+        {
+            if (string.IsNullOrEmpty(kb))
+                return "";
+
+            kb = kb.Trim();
+            if (kb.StartsWith("KB", StringComparison.OrdinalIgnoreCase))
+                return kb.ToUpper();
+
+            if (int.TryParse(kb, out _))
+                return $"KB{kb}";
+
+            return kb.ToUpper();
+        }
+
+        /// <summary>
+        /// Gets the missing KBs for a server considering supersedence chains
         /// </summary>
         private async Task<List<string>> GetMissingKbsWithSupersedence(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
         {
@@ -1018,38 +1116,28 @@ namespace CveWebApp.Controllers
 
             foreach (var requiredKb in requiredKbs)
             {
-                bool hasRequiredOrSuperseding = false;
-
-                // Check if the exact KB is installed
-                if (installedKbs.Any(installedKb => 
-                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
-                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
-                {
-                    hasRequiredOrSuperseding = true;
-                }
-                else
-                {
-                    // Check if any installed KB supersedes the required KB
-                    var supersedingKbs = await _context.KbSupersedences
-                        .Where(k => k.OriginalKb == requiredKb)
-                        .Where(k => product == null || k.Product == null || k.Product == product)
-                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
-                        .Select(k => k.SupersedingKb)
-                        .ToListAsync();
-
-                    hasRequiredOrSuperseding = supersedingKbs.Any(supersedingKb =>
-                        installedKbs.Any(installedKb =>
-                            installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
-                            installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
-                            ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase)));
-                }
-
-                if (!hasRequiredOrSuperseding)
+                var complianceInfo = await GetKbComplianceInfo(requiredKb, installedKbs, product, productFamily);
+                if (!complianceInfo.IsCompliant)
                     missingKbs.Add(requiredKb);
             }
 
             return missingKbs;
+        }
+
+        /// <summary>
+        /// Gets detailed compliance information for all required KBs
+        /// </summary>
+        private async Task<List<KbComplianceInfo>> GetDetailedComplianceInfo(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
+        {
+            var complianceInfos = new List<KbComplianceInfo>();
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                var complianceInfo = await GetKbComplianceInfo(requiredKb, installedKbs, product, productFamily);
+                complianceInfos.Add(complianceInfo);
+            }
+
+            return complianceInfos;
         }
 
     }
