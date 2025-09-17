@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Models;
 using CveWebApp.Data;
+using CveWebApp.Services;
 
 namespace CveWebApp.Controllers;
 
@@ -10,11 +11,13 @@ public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
     private readonly ApplicationDbContext _context;
+    private readonly IFileLoggingService _fileLoggingService;
 
-    public HomeController(ILogger<HomeController> logger, ApplicationDbContext context)
+    public HomeController(ILogger<HomeController> logger, ApplicationDbContext context, IFileLoggingService fileLoggingService)
     {
         _logger = logger;
         _context = context;
+        _fileLoggingService = fileLoggingService;
     }
 
     public IActionResult Index(string? searchMessage = null)
@@ -27,8 +30,17 @@ public class HomeController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SearchByCve(string cveId)
     {
+        var currentUser = User.Identity?.Name ?? "Anonymous";
+        var sourceIP = GetClientIpAddress();
+
         if (string.IsNullOrWhiteSpace(cveId))
         {
+            await _fileLoggingService.LogActionAsync(
+                "CVE Search", 
+                currentUser, 
+                "Failed: Empty CVE ID provided", 
+                sourceIP);
+            
             return RedirectToAction("Index", new { searchMessage = "Please enter a CVE ID to search." });
         }
 
@@ -44,11 +56,22 @@ public class HomeController : Controller
 
             if (cveRecords.Any())
             {
+                await _fileLoggingService.LogActionAsync(
+                    "CVE Search", 
+                    currentUser, 
+                    $"Successful search for '{cleanCveId}' - {cveRecords.Count} results found", 
+                    sourceIP);
+                
                 // Redirect to the search results page showing all affected products
                 return RedirectToAction("SearchResults", new { cveId = cleanCveId });
             }
             else
             {
+                await _fileLoggingService.LogActionAsync(
+                    "CVE Search", 
+                    currentUser, 
+                    $"No results found for '{cleanCveId}'", 
+                    sourceIP);
                 // No matching CVE found
                 var notFoundMessage = $"No CVE was found with ID '{cleanCveId}'. Please check the CVE ID and try again.";
                 return RedirectToAction("Index", new { searchMessage = notFoundMessage });
@@ -56,6 +79,12 @@ public class HomeController : Controller
         }
         catch (Exception ex)
         {
+            await _fileLoggingService.LogErrorAsync(
+                $"Error during CVE search for '{cleanCveId}': {ex.Message}", 
+                currentUser, 
+                sourceIP, 
+                ex);
+            
             _logger.LogError(ex, "Error searching for CVE ID: {CveId}", cleanCveId);
             var errorMessage = "An error occurred while searching. Please try again.";
             return RedirectToAction("Index", new { searchMessage = errorMessage });
@@ -138,5 +167,26 @@ public class HomeController : Controller
     public IActionResult Error()
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+    }
+
+    private string GetClientIpAddress()
+    {
+        // Check for X-Forwarded-For header first (proxy scenarios)
+        var xForwardedFor = Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(xForwardedFor))
+        {
+            // Take the first IP if multiple are present
+            return xForwardedFor.Split(',')[0].Trim();
+        }
+
+        // Check for X-Real-IP header
+        var xRealIp = Request.Headers["X-Real-IP"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(xRealIp))
+        {
+            return xRealIp;
+        }
+
+        // Fall back to connection remote IP
+        return Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
     }
 }

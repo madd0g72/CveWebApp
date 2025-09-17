@@ -18,12 +18,14 @@ namespace CveWebApp.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<CveController> _logger;
+        private readonly IFileLoggingService _fileLoggingService;
         private const int PageSize = 20; // Set your preferred page size here
 
-        public CveController(ApplicationDbContext context, ILogger<CveController> logger)
+        public CveController(ApplicationDbContext context, ILogger<CveController> logger, IFileLoggingService fileLoggingService)
         {
             _context = context;
             _logger = logger;
+            _fileLoggingService = fileLoggingService;
         }
 
         // GET: Cve
@@ -34,6 +36,16 @@ namespace CveWebApp.Controllers
             string maxSeverity = null,
             string article = null)
         {
+            // Log dashboard access
+            var currentUser = User.Identity?.Name ?? "Anonymous";
+            var sourceIP = GetClientIpAddress();
+            
+            await _fileLoggingService.LogActionAsync(
+                "CVE Dashboard Access", 
+                currentUser, 
+                $"Accessed CVE Dashboard (page {page})", 
+                sourceIP);
+
             var query = _context.CveUpdateStagings.AsQueryable();
 
             if (!string.IsNullOrEmpty(productFamily))
@@ -164,6 +176,9 @@ namespace CveWebApp.Controllers
             // Generate PDF
             try
             {
+                var currentUser = User.Identity?.Name ?? "Anonymous";
+                var sourceIP = GetClientIpAddress();
+                
                 var document = CreateCompliancePdfDocument(viewModel);
                 var pdfBytes = document.GeneratePdf();
                 
@@ -172,10 +187,28 @@ namespace CveWebApp.Controllers
                     ? SanitizeFilename(cveDetails.Details) 
                     : $"CVE{cveDetails.Id}";
                 var fileName = $"{cveNumber}_ComplianceReport_{DateTime.Now:yyyyMMdd}.pdf";
+                
+                // Log export action
+                await _fileLoggingService.LogActionAsync(
+                    "CVE Compliance PDF Export", 
+                    currentUser, 
+                    $"Exported PDF compliance report for {cveNumber}", 
+                    sourceIP);
+                
                 return File(pdfBytes, "application/pdf", fileName);
             }
             catch (Exception ex)
             {
+                var currentUser = User.Identity?.Name ?? "Anonymous";
+                var sourceIP = GetClientIpAddress();
+                
+                // Log error
+                await _fileLoggingService.LogErrorAsync(
+                    $"Error generating PDF compliance report: {ex.Message}", 
+                    currentUser, 
+                    sourceIP, 
+                    ex);
+                
                 // Log error and redirect back with error message
                 TempData["ErrorMessage"] = $"Error generating PDF: {ex.Message}";
                 return RedirectToAction(nameof(ComplianceOverview), new { id });
@@ -683,8 +716,17 @@ namespace CveWebApp.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Import(IFormFile csvFile)
         {
+            var currentUser = User.Identity?.Name ?? "Anonymous";
+            var sourceIP = GetClientIpAddress();
+
             if (csvFile == null || csvFile.Length == 0)
             {
+                await _fileLoggingService.LogActionAsync(
+                    "CVE Import Attempt", 
+                    currentUser, 
+                    "Failed: No file provided", 
+                    sourceIP);
+                
                 ModelState.AddModelError("", "Please select a CSV file to upload.");
                 return View();
             }
@@ -780,11 +822,25 @@ namespace CveWebApp.Controllers
                         ViewBag.SuccessMessage += $" ({errors.Count} rows skipped due to errors)";
                         ViewBag.Warnings = errors;
                     }
+                    
+                    // Log successful import
+                    await _fileLoggingService.LogActionAsync(
+                        "CVE Import Completed", 
+                        currentUser, 
+                        $"Successfully imported {importedCount} records from {csvFile.FileName}", 
+                        sourceIP);
                 }
                 else if (errors.Count >= 10)
                 {
                     ViewBag.ErrorMessage = $"Import failed: Too many errors ({errors.Count}). Please check your CSV file format and fix the issues.";
                     ViewBag.Errors = errors.Take(10).ToList(); // Show first 10 errors
+                    
+                    // Log failed import
+                    await _fileLoggingService.LogActionAsync(
+                        "CVE Import Failed", 
+                        currentUser, 
+                        $"Import failed: Too many errors ({errors.Count}) from {csvFile.FileName}", 
+                        sourceIP);
                 }
                 else if (importedCount == 0)
                 {
@@ -797,6 +853,12 @@ namespace CveWebApp.Controllers
             }
             catch (Exception ex)
             {
+                await _fileLoggingService.LogErrorAsync(
+                    $"Error during CVE import: {ex.Message}", 
+                    currentUser, 
+                    sourceIP, 
+                    ex);
+                
                 ModelState.AddModelError("", $"Error processing file: {ex.Message}");
             }
 
@@ -1221,6 +1283,27 @@ namespace CveWebApp.Controllers
             // Trim and ensure it's not empty
             sanitized = sanitized.Trim('_');
             return string.IsNullOrEmpty(sanitized) ? "Unknown" : sanitized;
+        }
+
+        private string GetClientIpAddress()
+        {
+            // Check for X-Forwarded-For header first (proxy scenarios)
+            var xForwardedFor = Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(xForwardedFor))
+            {
+                // Take the first IP if multiple are present
+                return xForwardedFor.Split(',')[0].Trim();
+            }
+
+            // Check for X-Real-IP header
+            var xRealIp = Request.Headers["X-Real-IP"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(xRealIp))
+            {
+                return xRealIp;
+            }
+
+            // Fall back to connection remote IP
+            return Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
         }
 
     }
