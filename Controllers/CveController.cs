@@ -208,13 +208,15 @@ namespace CveWebApp.Controllers
             // Calculate compliance for each server with supersedence consideration
             foreach (var server in serverGroups)
             {
-                server.MissingKbs = await GetMissingKbsWithSupersedence(
+                var complianceResult = await GetServerComplianceWithSupersedenceDetails(
                     viewModel.RequiredKbs, 
                     server.InstalledKbs, 
                     cveDetails.Product, 
                     cveDetails.ProductFamily);
                 
-                server.IsCompliant = viewModel.RequiredKbs.Count == 0 || server.MissingKbs.Count == 0;
+                server.MissingKbs = complianceResult.MissingKbs;
+                server.IsCompliant = complianceResult.IsCompliant;
+                server.SupersedenceNotes = complianceResult.SupersedenceNotes;
             }
 
             viewModel.ServerStatuses = serverGroups.OrderBy(s => s.Computer).ToList();
@@ -1052,5 +1054,82 @@ namespace CveWebApp.Controllers
             return missingKbs;
         }
 
+        /// <summary>
+        /// Gets comprehensive compliance information including supersedence details
+        /// </summary>
+        private async Task<ServerComplianceResult> GetServerComplianceWithSupersedenceDetails(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
+        {
+            var result = new ServerComplianceResult
+            {
+                MissingKbs = new List<string>(),
+                SupersedenceNotes = new List<string>(),
+                IsCompliant = true
+            };
+
+            if (requiredKbs.Count == 0)
+                return result;
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                bool hasRequiredOrSuperseding = false;
+                string? complianceReason = null;
+
+                // Check if the exact KB is installed
+                if (installedKbs.Any(installedKb => 
+                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
+                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
+                {
+                    hasRequiredOrSuperseding = true;
+                    complianceReason = $"Required KB {requiredKb} is directly installed";
+                }
+                else
+                {
+                    // Check if any installed KB supersedes the required KB
+                    var supersedingKbs = await _context.KbSupersedences
+                        .Where(k => k.OriginalKb == requiredKb)
+                        .Where(k => product == null || k.Product == null || k.Product == product)
+                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
+                        .Select(k => k.SupersedingKb)
+                        .ToListAsync();
+
+                    var foundSupersedingKb = supersedingKbs.FirstOrDefault(supersedingKb =>
+                        installedKbs.Any(installedKb =>
+                            installedKb.Equals(supersedingKb, StringComparison.OrdinalIgnoreCase) ||
+                            installedKb.Equals(supersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                            ("KB" + installedKb).Equals(supersedingKb, StringComparison.OrdinalIgnoreCase)));
+
+                    if (foundSupersedingKb != null)
+                    {
+                        hasRequiredOrSuperseding = true;
+                        complianceReason = $"Required KB {requiredKb} is superseded by installed KB {foundSupersedingKb}";
+                    }
+                }
+
+                if (hasRequiredOrSuperseding)
+                {
+                    if (!string.IsNullOrEmpty(complianceReason))
+                        result.SupersedenceNotes.Add(complianceReason);
+                }
+                else
+                {
+                    result.MissingKbs.Add(requiredKb);
+                }
+            }
+
+            result.IsCompliant = result.MissingKbs.Count == 0;
+            return result;
+        }
+
+    }
+
+    /// <summary>
+    /// Result class for server compliance checks with supersedence details
+    /// </summary>
+    public class ServerComplianceResult
+    {
+        public List<string> MissingKbs { get; set; } = new();
+        public List<string> SupersedenceNotes { get; set; } = new();
+        public bool IsCompliant { get; set; }
     }
 }

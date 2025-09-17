@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.AspNetCore.Identity;
 using CveWebApp.Data;
 using CveWebApp.Models;
+using CveWebApp.Services;
 using QuestPDF.Infrastructure;
 
 // Configure QuestPDF license
@@ -13,6 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Register the CSV data loader service
+builder.Services.AddScoped<CsvDataLoader>();
 
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
@@ -150,9 +154,10 @@ using (var scope = app.Services.CreateScope())
     {
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var csvDataLoader = scope.ServiceProvider.GetRequiredService<CsvDataLoader>();
 
         await SeedRolesAndUsersAsync(userManager, roleManager);
-        await SeedTestDataAsync(context);
+        await SeedRealDataAsync(context, csvDataLoader, app.Environment);
     }
 }
 
@@ -232,142 +237,69 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
     }
 }
 
-async Task SeedTestDataAsync(ApplicationDbContext context)
+async Task SeedRealDataAsync(ApplicationDbContext context, CsvDataLoader csvDataLoader, IWebHostEnvironment environment)
 {
+    // Only load real data in development if no data exists yet
     if (await context.CveUpdateStagings.AnyAsync())
         return;
 
-    var testCveRecords = new List<CveUpdateStaging>
+    var dataPath = Path.Combine(environment.ContentRootPath, "Data");
+    var msrcCsvPath = Path.Combine(dataPath, "MSRC_SecurityUpdates_2025_v3.csv");
+    var wsusCsvPath = Path.Combine(dataPath, "WSUS_InstalledKBs.csv");
+
+    try
     {
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-30),
-            ProductFamily = "Windows",
-            Product = "Windows 10",
-            Platform = "x64",
-            Impact = "Critical",
-            MaxSeverity = "Critical",
-            Article = "KB5001234",
-            Details = "CVE-2024-12345, CVE-2024-54321",
-            BaseScore = 9.8m,
-            CustomerActionRequired = true
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-15),
-            ProductFamily = "Windows",
-            Product = "Windows 11",
-            Platform = "x64",
-            Impact = "High",
-            MaxSeverity = "High",
-            Article = "KB5002345",
-            Details = "CVE-2024-99999",
-            BaseScore = 7.5m,
-            CustomerActionRequired = false
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-7),
-            ProductFamily = "Office",
-            Product = "Microsoft Office 2019",
-            Platform = "x86",
-            Impact = "Medium",
-            MaxSeverity = "Medium",
-            Article = "KB5003456",
-            Details = "CVE-2024-11111, CVE-2024-22222",
-            BaseScore = 5.2m,
-            CustomerActionRequired = true
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-45),
-            ProductFamily = "Windows",
-            Product = "Windows Server 2019",
-            Platform = "x64",
-            Impact = "Low",
-            MaxSeverity = "Low",
-            Article = "KB5004567",
-            Details = "CVE-2024-88888",
-            BaseScore = 3.1m,
-            CustomerActionRequired = false
-        },
-        new CveUpdateStaging
-        {
-            ReleaseDate = DateTime.Now.AddDays(-60),
-            ProductFamily = "Office",
-            Product = "Microsoft Office 2021",
-            Platform = "x64",
-            Impact = "High",
-            MaxSeverity = "High",
-            Article = "KB5005678",
-            Details = "CVE-2024-77777",
-            BaseScore = 8.2m,
-            CustomerActionRequired = true
-        }
+        // Load MSRC security updates data
+        await csvDataLoader.LoadMsrcSecurityUpdatesAsync(msrcCsvPath);
+        
+        // Load WSUS installed KBs data
+        await csvDataLoader.LoadWsusInstalledKbsAsync(wsusCsvPath);
+        
+        // Process supersedence relationships from the loaded data
+        await csvDataLoader.ProcessSupersedenceRelationshipsAsync();
+    }
+    catch (Exception ex)
+    {
+        // Log error but don't fail the application startup
+        Console.WriteLine($"Error loading CSV data: {ex.Message}");
+        
+        // Fall back to minimal test data if CSV loading fails
+        await SeedMinimalTestDataAsync(context);
+    }
+}
+
+async Task SeedMinimalTestDataAsync(ApplicationDbContext context)
+{
+    // Minimal fallback data in case CSV loading fails
+    var fallbackCveRecord = new CveUpdateStaging
+    {
+        ReleaseDate = DateTime.Now.AddDays(-30),
+        ProductFamily = "Windows",
+        Product = "Windows Server 2016",
+        Platform = "x64",
+        Impact = "Critical",
+        MaxSeverity = "Critical",
+        Article = "KB5058383",
+        Details = "CVE-2025-29833",
+        BaseScore = 7.7m,
+        CustomerActionRequired = true,
+        Supercedence = "5055521"
     };
 
-    context.CveUpdateStagings.AddRange(testCveRecords);
+    context.CveUpdateStagings.Add(fallbackCveRecord);
 
-    // Add some test server data to demonstrate actual compliance calculations
-    var testServerData = new List<ServerInstalledKb>
+    // Add our test server
+    var fallbackServerData = new List<ServerInstalledKb>
     {
-        // Windows 10 servers with some KBs installed
-        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5001234" },
-        new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5000123" },
-        new ServerInstalledKb { Computer = "WIN10-SRV-02", OSProduct = "Windows 10 Pro", KB = "5000456" },
-        
-        // Windows 11 servers
-        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5002345" },
-        new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5001000" },
-        new ServerInstalledKb { Computer = "WIN11-SRV-02", OSProduct = "Windows 11 Pro", KB = "5001001" },
-        
-        // Office servers
-        new ServerInstalledKb { Computer = "OFFICE-SRV-01", OSProduct = "Microsoft Office 2019", KB = "5003456" },
-        new ServerInstalledKb { Computer = "OFFICE-SRV-02", OSProduct = "Microsoft Office 2019", KB = "5003000" },
-        
-        // Windows Server 2019
-        new ServerInstalledKb { Computer = "WS2019-SRV-01", OSProduct = "Windows Server 2019", KB = "5004567" },
-        new ServerInstalledKb { Computer = "WS2019-SRV-02", OSProduct = "Windows Server 2019", KB = "5004567" },
-        
-        // Office 2021 servers
-        new ServerInstalledKb { Computer = "O365-SRV-01", OSProduct = "Microsoft Office 2021", KB = "5005678" },
-        new ServerInstalledKb { Computer = "O365-SRV-02", OSProduct = "Microsoft Office 2021", KB = "5005000" }
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "4052623" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5065427" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "2267602" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5012170" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "925673" },
+        new ServerInstalledKb { Computer = "wc-docprot-fe1.lottomatica.net", OSProduct = "Windows Server 2016 Datacenter", KB = "5065687" }
     };
 
-    context.ServerInstalledKbs.AddRange(testServerData);
-    
-    // Add test supersedence data to demonstrate the functionality
-    var testSupersedenceData = new List<KbSupersedence>
-    {
-        // KB5000456 supersedes KB5001234 (this will make WIN10-SRV-02 compliant)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5001234", 
-            SupersedingKb = "KB5000456", 
-            Product = "Windows 10", 
-            ProductFamily = "Windows",
-            DateAdded = DateTime.UtcNow 
-        },
-        // KB5003000 supersedes KB5003456 (for Office scenarios)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5003456", 
-            SupersedingKb = "KB5003000", 
-            Product = "Microsoft Office 2019", 
-            ProductFamily = "Office",
-            DateAdded = DateTime.UtcNow 
-        },
-        // KB5002345 supersedes KB5002000 (for Windows 11 scenarios)
-        new KbSupersedence 
-        { 
-            OriginalKb = "KB5002000", 
-            SupersedingKb = "KB5002345", 
-            Product = "Windows 11", 
-            ProductFamily = "Windows",
-            DateAdded = DateTime.UtcNow 
-        }
-    };
-    
-    context.KbSupersedences.AddRange(testSupersedenceData);
+    context.ServerInstalledKbs.AddRange(fallbackServerData);
+
     await context.SaveChangesAsync();
 }
