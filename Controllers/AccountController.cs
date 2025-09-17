@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using CveWebApp.Models;
 using CveWebApp.Data;
+using CveWebApp.Services;
 
 namespace CveWebApp.Controllers
 {
@@ -14,12 +15,14 @@ namespace CveWebApp.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _context;
+        private readonly IFileLoggingService _fileLoggingService;
 
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context)
+        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IFileLoggingService fileLoggingService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
+            _fileLoggingService = fileLoggingService;
         }
 
         // GET: Account/Login
@@ -61,6 +64,14 @@ namespace CveWebApp.Controllers
                 {
                     // Log successful login
                     await LogLoginAttemptAsync(model.Email, user?.Email, sourceIP, userAgent, true, null);
+                    
+                    // Log to file
+                    await _fileLoggingService.LogActionAsync(
+                        "User Login", 
+                        user?.Email ?? model.Email, 
+                        $"Successful login from {sourceIP}", 
+                        sourceIP);
+                    
                     return RedirectToLocal(returnUrl);
                 }
                 else
@@ -76,6 +87,13 @@ namespace CveWebApp.Controllers
                     // Log failed login
                     await LogLoginAttemptAsync(model.Email, user?.Email, sourceIP, userAgent, false, failureReason);
                     
+                    // Log to file
+                    await _fileLoggingService.LogActionAsync(
+                        "Failed Login Attempt", 
+                        user?.Email ?? model.Email, 
+                        $"Failed login from {sourceIP}: {failureReason}", 
+                        sourceIP);
+                    
                     ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                 }
             }
@@ -88,7 +106,18 @@ namespace CveWebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            var currentUser = User.Identity?.Name ?? "Anonymous";
+            var sourceIP = GetClientIpAddress();
+            
             await _signInManager.SignOutAsync();
+            
+            // Log logout action
+            await _fileLoggingService.LogActionAsync(
+                "User Logout", 
+                currentUser, 
+                $"User logged out from {sourceIP}", 
+                sourceIP);
+            
             return RedirectToAction("Index", "Home");
         }
 
@@ -254,8 +283,13 @@ namespace CveWebApp.Controllers
             }
             catch (Exception ex)
             {
-                // Log the error but don't let it prevent login
-                // In production, you might want to use a proper logging framework
+                // Log the error to file logging system and console
+                await _fileLoggingService.LogErrorAsync(
+                    $"Failed to log login attempt to database: {ex.Message}", 
+                    username, 
+                    sourceIP, 
+                    ex);
+                    
                 Console.WriteLine($"Failed to log login attempt: {ex.Message}");
             }
         }

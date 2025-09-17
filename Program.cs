@@ -15,6 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Add file logging service
+builder.Services.AddScoped<CveWebApp.Services.IFileLoggingService, CveWebApp.Services.FileLoggingService>();
+
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
 if (string.IsNullOrEmpty(dbProvider))
