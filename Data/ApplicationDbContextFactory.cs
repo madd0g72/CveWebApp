@@ -9,15 +9,34 @@ namespace CveWebApp.Data
     {
         public ApplicationDbContext CreateDbContext(string[] args)
         {
+            // Determine environment from environment variable or command line args
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+            
+            // Build configuration with environment-specific settings
             IConfigurationRoot configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: false)
-                .AddJsonFile("appsettings.Production.json", optional: true) // <-- add this line!
+                .AddJsonFile($"appsettings.{environment}.json", optional: true)
+                .AddEnvironmentVariables()
                 .Build();
 
             var builder = new DbContextOptionsBuilder<ApplicationDbContext>();
             var connectionString = configuration.GetConnectionString("DefaultConnection");
-            var dbProvider = configuration["DatabaseProvider"] ?? "MariaDb";
+            var dbProvider = configuration["DatabaseProvider"];
+            
+            // Set environment-specific defaults if not explicitly configured
+            if (string.IsNullOrEmpty(dbProvider))
+            {
+                dbProvider = environment.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "MariaDb" : "SqlServer";
+            }
+
+            // Validate that we have a connection string for relational databases
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new InvalidOperationException(
+                    $"No connection string found for environment '{environment}'. " +
+                    $"Please configure 'DefaultConnection' in appsettings.{environment}.json");
+            }
 
             if (dbProvider.Equals("MariaDb", StringComparison.OrdinalIgnoreCase))
             {
@@ -29,7 +48,7 @@ namespace CveWebApp.Data
             }
             else
             {
-                throw new Exception($"Unsupported DatabaseProvider: {dbProvider}");
+                throw new Exception($"Unsupported DatabaseProvider: {dbProvider}. Supported providers: MariaDb, SqlServer");
             }
 
             return new ApplicationDbContext(builder.Options);

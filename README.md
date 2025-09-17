@@ -47,46 +47,53 @@ For development and testing purposes:
 
 ## Getting Started
 
+## Getting Started
+
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [MariaDB](https://mariadb.org/) or MySQL (optional - uses in-memory database by default)
+- **Development**: [MariaDB](https://mariadb.org/) or MySQL (optional - uses in-memory database by default)  
+- **Production**: [SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) (required)
 
-### Setup
+### Environment Setup
 
-1. **Clone the repository:**
+> **Important**: This application uses different database providers for different environments:
+> - **Development**: MariaDB/MySQL (with in-memory fallback for testing)
+> - **Production**: SQL Server Express
+> 
+> See [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed configuration instructions.
 
-    ```bash
-    git clone https://github.com/madd0g72/CVEWebApp.git
-    cd CVEWebApp
-    ```
+### Quick Start
 
-2. **Configure the database connection (optional):**
+#### Development (In-Memory Database)
+```bash
+git clone https://github.com/madd0g72/CVEWebApp.git
+cd CVEWebApp
+dotnet run --environment Development
+```
 
-    Edit `appsettings.json` and set your MariaDB connection string:
+#### Development (With MariaDB)
+```bash
+# 1. Install and start MariaDB/MySQL
+# 2. Update appsettings.Development.json with your connection string
+# 3. Run the application
+dotnet run --environment Development
+```
 
-    ```json
-    "ConnectionStrings": {
-      "DefaultConnection": "server=localhost;database=cve_db;user=root;password=yourpassword;"
-    }
-    ```
+#### Production (SQL Server Express)
+```bash
+# 1. Install SQL Server Express
+# 2. Update appsettings.Production.json with your connection string  
+# 3. Run the application
+dotnet run --environment Production
+```
 
-    **Note**: If no connection string is provided, the application will use an in-memory database with pre-seeded test data.
+### Default Login Credentials (Development Only)
 
-3. **Run the application:**
+- **Admin**: `admin@cveapp.local` / `admin123`
+- **User**: `user@cveapp.local` / `user123`
 
-    ```bash
-    dotnet run
-    ```
-
-4. **Access the app:**
-
-    Open your browser and go to [https://localhost:5001](https://localhost:5001)
-
-5. **Login with demo credentials:**
-
-    - **Admin**: `admin@cveapp.local` / `admin123`
-    - **User**: `user@cveapp.local` / `user123`
+> **Note**: Test accounts are only created in Development environment.
 
 ## Usage
 
@@ -139,13 +146,25 @@ The application uses Entity Framework Core with the following main entities:
 
 ## Production Deployment
 
-For production deployment:
+## Production Deployment
 
-1. **Configure a real database** in `appsettings.Production.json`
-2. **Set secure passwords** for admin accounts
-3. **Review password policies** in `Program.cs` (currently simplified for development)
-4. **Configure HTTPS** and security headers
-5. **Set up proper user management** workflow
+For production deployment, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed instructions.
+
+**Key Requirements for Production:**
+
+1. **Install SQL Server Express** - Required database provider for production
+2. **Configure secure connection string** in `appsettings.Production.json`
+3. **Set secure passwords** for admin accounts (no test accounts in production)
+4. **Review password policies** in `Program.cs` (currently simplified for development)
+5. **Configure HTTPS** and security headers
+6. **Set up proper user management** workflow
+7. **Use environment variable** `ASPNETCORE_ENVIRONMENT=Production`
+
+**Environment Separation:**
+- ✅ **Development**: Uses MariaDB/MySQL (or in-memory for testing)
+- ✅ **Production**: Uses SQL Server Express  
+- ✅ **Auto-validation**: Prevents database provider mismatches
+- ✅ **Idempotent migrations**: Safe database setup on first startup
 
 ## Contributing
 

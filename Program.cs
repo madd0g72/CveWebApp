@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.AspNetCore.Identity;
 using CveWebApp.Data;
 using CveWebApp.Models;
@@ -12,8 +14,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Detect provider from config
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "MariaDb";
+// Detect provider from config with environment-specific defaults
+var dbProvider = builder.Configuration["DatabaseProvider"];
+if (string.IsNullOrEmpty(dbProvider))
+{
+    // Set environment-specific defaults if not explicitly configured
+    dbProvider = builder.Environment.IsDevelopment() ? "MariaDb" : "SqlServer";
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -74,12 +81,64 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
+    var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    
     // Only run migrations if using a relational database provider
     if (!context.Database.IsInMemory())
     {
-        // This will create the database and apply any pending migrations
-        await context.Database.MigrateAsync();
+        // Validate environment and database provider alignment for relational databases
+        var currentProvider = context.Database.ProviderName;
+        var expectedProvider = environment.IsDevelopment() ? "Pomelo.EntityFrameworkCore.MySql" : "Microsoft.EntityFrameworkCore.SqlServer";
+        
+        if (currentProvider != null && !currentProvider.Contains(expectedProvider.Split('.').Last()))
+        {
+            var env = environment.IsDevelopment() ? "Development" : "Production";
+            var expected = environment.IsDevelopment() ? "MariaDb/MySQL" : "SQL Server";
+            throw new InvalidOperationException(
+                $"Database provider mismatch! {env} environment expects {expected} but got {currentProvider}. " +
+                "Check your appsettings configuration.");
+        }
+        
+        // Check if database exists and has tables
+        var canConnect = await context.Database.CanConnectAsync();
+        if (canConnect)
+        {
+            // Check if any tables exist (look for AspNetUsers as it's always created)
+            var hasSchema = await context.Database.GetService<IRelationalDatabaseCreator>().HasTablesAsync();
+            
+            if (!hasSchema)
+            {
+                // Database exists but is empty - create schema using EnsureCreated for cross-provider compatibility
+                await context.Database.EnsureCreatedAsync();
+            }
+            else
+            {
+                // Database has tables - apply pending migrations only if using MySQL (migrations are MySQL-specific)
+                if (currentProvider != null && currentProvider.Contains("MySql"))
+                {
+                    var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                    if (pendingMigrations.Any())
+                    {
+                        await context.Database.MigrateAsync();
+                    }
+                }
+                // For SQL Server with existing schema, skip migrations as they contain MySQL-specific code
+            }
+        }
+        else
+        {
+            // Database doesn't exist - create it
+            if (currentProvider != null && currentProvider.Contains("MySql"))
+            {
+                // For MySQL, use migrations
+                await context.Database.MigrateAsync();
+            }
+            else
+            {
+                // For SQL Server, use EnsureCreated to avoid MySQL-specific migration issues
+                await context.Database.EnsureCreatedAsync();
+            }
+        }
     }
     else
     {
