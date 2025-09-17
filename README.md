@@ -88,12 +88,20 @@ dotnet run --environment Development
 dotnet run --environment Production
 ```
 
-### Default Login Credentials (Development Only)
+### Default Login Credentials
 
+#### Development Environment
 - **Admin**: `admin@cveapp.local` / `admin123`
 - **User**: `user@cveapp.local` / `user123`
 
 > **Note**: Test accounts are only created in Development environment.
+
+#### Production Environment
+- **Default Admin**: `admin@company.local` / `AdminPass1!`
+
+> **⚠️ CRITICAL**: Change the default admin password immediately after first deployment!
+> 
+> See [PRODUCTION_ADMIN_SETUP.md](PRODUCTION_ADMIN_SETUP.md) for detailed setup instructions.
 
 ## Usage
 
@@ -146,9 +154,22 @@ The application uses Entity Framework Core with the following main entities:
 
 ## Production Deployment
 
-## Production Deployment
-
 For production deployment, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed instructions.
+
+**Key Requirements for Production:**
+
+1. **Install SQL Server Express** - Required database provider for production
+2. **Configure secure connection string** in `appsettings.Production.json`
+3. **Admin User Setup** - Default admin created automatically on first run
+4. **Change Default Password** - See [PRODUCTION_ADMIN_SETUP.md](PRODUCTION_ADMIN_SETUP.md) for admin setup
+5. **Set Environment Variable** - `ASPNETCORE_ENVIRONMENT=Production`
+6. **Self-Service Password Reset** - No email configuration required
+
+**⚠️ Production Security Notes:**
+- Default admin user (`admin@company.local`) created with password `AdminPass1!`
+- **Change the default password immediately** after deployment
+- Production environment enforces strong password policies
+- Self-service password reset available for users without email dependency
 
 **Key Requirements for Production:**
 

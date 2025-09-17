@@ -14,12 +14,14 @@ namespace CveWebApp.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _context;
+        private readonly IWebHostEnvironment _environment;
 
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context)
+        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IWebHostEnvironment environment)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
+            _environment = environment;
         }
 
         // GET: Account/Login
@@ -124,10 +126,19 @@ namespace CveWebApp.Controllers
                 // Generate password reset token
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
                 
-                // In a production environment, you would send this via email
-                // For demo purposes, we'll store it in TempData to display it
-                TempData["ResetToken"] = code;
-                TempData["ResetEmail"] = model.Email;
+                if (_environment.IsDevelopment())
+                {
+                    // In development, display the reset token directly
+                    TempData["ResetToken"] = code;
+                    TempData["ResetEmail"] = model.Email;
+                }
+                else
+                {
+                    // In production, provide immediate reset access without email
+                    TempData["ResetToken"] = code;
+                    TempData["ResetEmail"] = model.Email;
+                    TempData["ProductionMode"] = true;
+                }
                 
                 return RedirectToAction(nameof(ForgotPasswordConfirmation));
             }
