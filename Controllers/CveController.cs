@@ -178,6 +178,42 @@ namespace CveWebApp.Controllers
             }
         }
 
+        // GET: Cve/ExportComplianceCsv/5
+        [Authorize]
+        public async Task<IActionResult> ExportComplianceCsv(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cveDetails = await _context.CveUpdateStagings
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (cveDetails == null)
+            {
+                return NotFound();
+            }
+
+            var viewModel = await BuildComplianceViewModelAsync(cveDetails);
+            
+            // Generate CSV content
+            try
+            {
+                var csvContent = CreateComplianceCsvContent(viewModel);
+                var csvBytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+                
+                var fileName = $"CVE_Compliance_Report_{cveDetails.Id}_{DateTime.Now:yyyyMMdd}.csv";
+                return File(csvBytes, "text/csv", fileName);
+            }
+            catch (Exception ex)
+            {
+                // Log error and redirect back with error message
+                TempData["ErrorMessage"] = $"Error generating CSV: {ex.Message}";
+                return RedirectToAction(nameof(ComplianceOverview), new { id });
+            }
+        }
+
         private async Task<ComplianceViewModel> BuildComplianceViewModelAsync(CveUpdateStaging cveDetails)
         {
             var viewModel = new ComplianceViewModel
@@ -417,6 +453,66 @@ namespace CveWebApp.Controllers
                 return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3)
                     .Background(Colors.Grey.Lighten4);
             }
+        }
+
+        private string CreateComplianceCsvContent(ComplianceViewModel viewModel)
+        {
+            var csv = new System.Text.StringBuilder();
+            
+            // Add CVE Information section
+            csv.AppendLine("## CVE Information");
+            csv.AppendLine("CVE Number,Product Family,Product,Article,Max Severity,Release Date,Required KBs");
+            csv.AppendLine($"\"{viewModel.CveDetails.Details ?? "Not specified"}\"," +
+                          $"\"{viewModel.CveDetails.ProductFamily ?? "N/A"}\"," +
+                          $"\"{viewModel.CveDetails.Product ?? "N/A"}\"," +
+                          $"\"{viewModel.CveDetails.Article ?? "N/A"}\"," +
+                          $"\"{viewModel.CveDetails.MaxSeverity ?? "N/A"}\"," +
+                          $"\"{viewModel.CveDetails.ReleaseDate?.ToString("yyyy-MM-dd") ?? "N/A"}\"," +
+                          $"\"{(viewModel.RequiredKbs.Any() ? string.Join(", ", viewModel.RequiredKbs) : "None identified")}\"");
+            
+            csv.AppendLine();
+            
+            // Add Compliance Summary section
+            csv.AppendLine("## Compliance Summary");
+            csv.AppendLine("Total Servers,Compliant Servers,Non-Compliant Servers,Compliance Percentage");
+            csv.AppendLine($"{viewModel.Summary.TotalServers}," +
+                          $"{viewModel.Summary.CompliantServers}," +
+                          $"{viewModel.Summary.NonCompliantServers}," +
+                          $"{viewModel.Summary.CompliancePercentage:F1}%");
+            
+            csv.AppendLine();
+            
+            // Add Server Details section
+            csv.AppendLine("## Server Compliance Details");
+            csv.AppendLine("Computer Name,OS Product,Status,Installed KBs,Missing KBs,Supersedence Info");
+            
+            foreach (var server in viewModel.ServerStatuses)
+            {
+                var status = server.IsCompliant 
+                    ? (viewModel.RequiredKbs.Count == 0 ? "Not Applicable" : "Compliant")
+                    : "Non-Compliant";
+                
+                var installedKbs = server.InstalledKbs.Any() 
+                    ? string.Join(", ", server.InstalledKbs)
+                    : "None";
+                
+                var missingKbs = server.MissingKbs.Any()
+                    ? string.Join(", ", server.MissingKbs)
+                    : "None";
+                
+                var supersedenceInfo = server.SupersedenceNotes.Any()
+                    ? string.Join("; ", server.SupersedenceNotes)
+                    : (server.IsCompliant && viewModel.RequiredKbs.Any() ? "Direct KB match" : "-");
+                
+                csv.AppendLine($"\"{server.Computer}\"," +
+                              $"\"{server.OSProduct}\"," +
+                              $"\"{status}\"," +
+                              $"\"{installedKbs}\"," +
+                              $"\"{missingKbs}\"," +
+                              $"\"{supersedenceInfo}\"");
+            }
+            
+            return csv.ToString();
         }
 
         private List<string> ExtractKbsFromArticle(string? article)
