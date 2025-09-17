@@ -1,0 +1,205 @@
+@model CveWebApp.Models.ServerImportViewModel
+@{
+    ViewData["Title"] = "Import Server Data";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2><i class="fas fa-upload"></i> Import Server Data</h2>
+        <p class="text-muted">Upload CSV files containing server information. The system will match servers by name and update existing records or create new ones.</p>
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> @Model.SuccessMessage
+                @if (Model.ImportedCount > 0 || Model.UpdatedCount > 0)
+                {
+                    <ul class="mt-2 mb-0">
+                        @if (Model.ImportedCount > 0)
+                        {
+                            <li>@Model.ImportedCount new servers imported</li>
+                        }
+                        @if (Model.UpdatedCount > 0)
+                        {
+                            <li>@Model.UpdatedCount existing servers updated</li>
+                        }
+                        @if (Model.ConflictCount > 0)
+                        {
+                            <li class="text-warning">@Model.ConflictCount conflicts detected (see below)</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> @Model.ErrorMessage
+            </div>
+        }
+
+        @if (Model.Warnings?.Any() == true)
+        {
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle"></i> Import Warnings:</h6>
+                <ul class="mb-0">
+                    @foreach (var warning in Model.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <!-- CSV Format Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#csvFormat" aria-expanded="false">
+                        <i class="fas fa-info-circle"></i> CSV Format Information
+                    </button>
+                </h5>
+            </div>
+            <div id="csvFormat" class="collapse">
+                <div class="card-body">
+                    <h6>Required Column:</h6>
+                    <ul>
+                        <li><strong>ServerName</strong> - Unique identifier for the server (required for all operations)</li>
+                    </ul>
+                    
+                    <h6>Optional Columns:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul>
+                                <li>VCenter</li>
+                                <li>Cluster</li>
+                                <li>Project</li>
+                                <li>Environment</li>
+                                <li>IDEL</li>
+                                <li>ServerIP</li>
+                                <li>ManagementIP (or "ServerIP (mgt)")</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul>
+                                <li>OperatingSystem</li>
+                                <li>OperatingSystemVersion</li>
+                                <li>LastBootTime</li>
+                                <li>LocalAdmins</li>
+                                <li>OSDiskSize</li>
+                                <li>OSDiskFree</li>
+                                <li>ServiceOwner</li>
+                                <li>MaintenanceWindows</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-lightbulb"></i>
+                        <strong>Note:</strong> Column names are case-insensitive. You can import partial data - only columns present in your CSV will be updated.
+                        If a server already exists, the system will detect conflicts between existing and new values.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-body">
+                <form asp-action="Import" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    
+                    <div class="mb-3">
+                        <label for="csvFile" class="form-label">Select CSV File</label>
+                        <input type="file" class="form-control" id="csvFile" name="csvFile" accept=".csv" required>
+                        <div class="form-text">Choose a CSV file containing server data. Maximum file size: 10MB</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Server List
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Import CSV Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Import Conflicts -->
+        @if (Model.Conflicts?.Any() == true)
+        {
+            <div class="card mt-4">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Import Conflicts Detected</h5>
+                </div>
+                <div class="card-body">
+                    <p>The following conflicts were detected during import. The system used the new values by default:</p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Server</th>
+                                    <th>Field</th>
+                                    <th>Existing Value</th>
+                                    <th>New Value</th>
+                                    <th>Resolution</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var conflict in Model.Conflicts)
+                                {
+                                    <tr>
+                                        <td><strong>@conflict.ServerName</strong></td>
+                                        <td>@conflict.Field</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(conflict.ExistingValue))
+                                            {
+                                                <span class="text-muted">@conflict.ExistingValue</span>
+                                            }
+                                            else
+                                            {
+                                                <em class="text-muted">(empty)</em>
+                                            }
+                                        </td>
+                                        <td><strong>@conflict.NewValue</strong></td>
+                                        <td>
+                                            @switch (conflict.Resolution)
+                                            {
+                                                case CveWebApp.Models.ConflictResolution.UseNew:
+                                                    <span class="badge bg-success">Used New</span>
+                                                    break;
+                                                case CveWebApp.Models.ConflictResolution.KeepExisting:
+                                                    <span class="badge bg-info">Kept Existing</span>
+                                                    break;
+                                                case CveWebApp.Models.ConflictResolution.Skip:
+                                                    <span class="badge bg-warning">Skipped</span>
+                                                    break;
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Validate file size before upload
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.size > 10 * 1024 * 1024) { // 10MB
+                alert('File size must be less than 10MB');
+                e.target.value = '';
+            }
+        });
+    </script>
+}

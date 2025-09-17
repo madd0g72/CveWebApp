@@ -1,0 +1,192 @@
+@model CveWebApp.Models.ServerListViewModel
+@{
+    ViewData["Title"] = "Server Assets";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2><i class="fas fa-server"></i> Server Assets</h2>
+            @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+            {
+                <a asp-action="Import" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Import Servers
+                </a>
+            }
+        </div>
+
+        <!-- Filters -->
+        <form method="get" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="serverNameFilter" class="form-label">Server Name</label>
+                    <input type="text" class="form-control" id="serverNameFilter" name="serverNameFilter" value="@Model.ServerNameFilter" placeholder="Filter by server name">
+                </div>
+                <div class="col-md-2">
+                    <label for="environmentFilter" class="form-label">Environment</label>
+                    <input type="text" class="form-control" id="environmentFilter" name="environmentFilter" value="@Model.EnvironmentFilter" placeholder="Environment">
+                </div>
+                <div class="col-md-2">
+                    <label for="projectFilter" class="form-label">Project</label>
+                    <input type="text" class="form-control" id="projectFilter" name="projectFilter" value="@Model.ProjectFilter" placeholder="Project">
+                </div>
+                <div class="col-md-3">
+                    <label for="operatingSystemFilter" class="form-label">Operating System</label>
+                    <input type="text" class="form-control" id="operatingSystemFilter" name="operatingSystemFilter" value="@Model.OperatingSystemFilter" placeholder="OS">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        <!-- Results Summary -->
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Showing @Model.Servers.Count() of @Model.TotalCount servers
+                    @if (Model.PageNumber > 1 || Model.TotalPages > 1)
+                    {
+                        <span>(Page @Model.PageNumber of @Model.TotalPages)</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (!Model.Servers.Any())
+        {
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                No servers found. 
+                @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+                {
+                    <text><a asp-action="Import" class="alert-link">Import server data</a> to get started.</text>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- Server List Table -->
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Server Name</th>
+                            <th>Environment</th>
+                            <th>Project</th>
+                            <th>Operating System</th>
+                            <th>Server IP</th>
+                            <th>Service Owner</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var server in Model.Servers)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@server.ServerName</strong>
+                                    @if (!string.IsNullOrEmpty(server.Cluster))
+                                    {
+                                        <br><small class="text-muted">Cluster: @server.Cluster</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(server.Environment))
+                                    {
+                                        <span class="badge bg-secondary">@server.Environment</span>
+                                    }
+                                </td>
+                                <td>@server.Project</td>
+                                <td>
+                                    @server.OperatingSystem
+                                    @if (!string.IsNullOrEmpty(server.OperatingSystemVersion))
+                                    {
+                                        <br><small class="text-muted">@server.OperatingSystemVersion</small>
+                                    }
+                                </td>
+                                <td>
+                                    @server.ServerIP
+                                    @if (!string.IsNullOrEmpty(server.ManagementIP) && server.ManagementIP != server.ServerIP)
+                                    {
+                                        <br><small class="text-muted">Mgmt: @server.ManagementIP</small>
+                                    }
+                                </td>
+                                <td>@server.ServiceOwner</td>
+                                <td>
+                                    @if (server.LastUpdated != default)
+                                    {
+                                        @server.LastUpdated.ToString("yyyy-MM-dd HH:mm")
+                                    }
+                                </td>
+                                <td>
+                                    <a asp-action="Details" asp-route-id="@server.Id" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> Details
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Server pagination">
+                    <ul class="pagination justify-content-center">
+                        @if (Model.PageNumber > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("Index", new { 
+                                    page = Model.PageNumber - 1, 
+                                    environmentFilter = Model.EnvironmentFilter,
+                                    projectFilter = Model.ProjectFilter,
+                                    operatingSystemFilter = Model.OperatingSystemFilter,
+                                    serverNameFilter = Model.ServerNameFilter 
+                                })">Previous</a>
+                            </li>
+                        }
+
+                        @for (int i = Math.Max(1, Model.PageNumber - 2); i <= Math.Min(Model.TotalPages, Model.PageNumber + 2); i++)
+                        {
+                            <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                                <a class="page-link" href="@Url.Action("Index", new { 
+                                    page = i, 
+                                    environmentFilter = Model.EnvironmentFilter,
+                                    projectFilter = Model.ProjectFilter,
+                                    operatingSystemFilter = Model.OperatingSystemFilter,
+                                    serverNameFilter = Model.ServerNameFilter 
+                                })">@i</a>
+                            </li>
+                        }
+
+                        @if (Model.PageNumber < Model.TotalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("Index", new { 
+                                    page = Model.PageNumber + 1, 
+                                    environmentFilter = Model.EnvironmentFilter,
+                                    projectFilter = Model.ProjectFilter,
+                                    operatingSystemFilter = Model.OperatingSystemFilter,
+                                    serverNameFilter = Model.ServerNameFilter 
+                                })">Next</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            }
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+}
