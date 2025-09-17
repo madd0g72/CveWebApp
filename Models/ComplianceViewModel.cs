@@ -23,6 +23,14 @@ namespace CveWebApp.Models
         public List<string> InstalledKbs { get; set; } = new();
         public List<string> MissingKbs { get; set; } = new();
         public bool IsCompliant { get; set; }
+        public List<SupersedenceInfo> SupersedenceDetails { get; set; } = new();
+    }
+
+    public class SupersedenceInfo
+    {
+        public string RequiredKb { get; set; } = string.Empty;
+        public string SupersedingKb { get; set; } = string.Empty;
+        public string ComplianceReason { get; set; } = string.Empty; // "Direct KB" or "Superseding KB"
     }
 
     public class ComplianceSummary

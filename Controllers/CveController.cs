@@ -214,6 +214,12 @@ namespace CveWebApp.Controllers
                     cveDetails.Product, 
                     cveDetails.ProductFamily);
                 
+                server.SupersedenceDetails = await GetSupersedenceInfoAsync(
+                    viewModel.RequiredKbs,
+                    server.InstalledKbs,
+                    cveDetails.Product,
+                    cveDetails.ProductFamily);
+                
                 server.IsCompliant = viewModel.RequiredKbs.Count == 0 || server.MissingKbs.Count == 0;
             }
 
@@ -963,6 +969,59 @@ namespace CveWebApp.Controllers
             }
 
             return kbs.ToList();
+        }
+
+        /// <summary>
+        /// Gets supersedence information for a server's compliance
+        /// </summary>
+        private async Task<List<SupersedenceInfo>> GetSupersedenceInfoAsync(List<string> requiredKbs, List<string> installedKbs, string? product, string? productFamily)
+        {
+            var supersedenceInfo = new List<SupersedenceInfo>();
+
+            foreach (var requiredKb in requiredKbs)
+            {
+                // Check if the exact KB is installed
+                if (installedKbs.Any(installedKb => 
+                    installedKb.Equals(requiredKb, StringComparison.OrdinalIgnoreCase) ||
+                    installedKb.Equals(requiredKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                    ("KB" + installedKb).Equals(requiredKb, StringComparison.OrdinalIgnoreCase)))
+                {
+                    supersedenceInfo.Add(new SupersedenceInfo
+                    {
+                        RequiredKb = requiredKb,
+                        SupersedingKb = requiredKb,
+                        ComplianceReason = "Direct KB"
+                    });
+                }
+                else
+                {
+                    // Check for superseding KBs
+                    var supersedingKbs = await _context.KbSupersedences
+                        .Where(k => k.OriginalKb == requiredKb)
+                        .Where(k => product == null || k.Product == null || k.Product == product)
+                        .Where(k => productFamily == null || k.ProductFamily == null || k.ProductFamily == productFamily)
+                        .ToListAsync();
+
+                    foreach (var supersedence in supersedingKbs)
+                    {
+                        if (installedKbs.Any(installedKb =>
+                            installedKb.Equals(supersedence.SupersedingKb, StringComparison.OrdinalIgnoreCase) ||
+                            installedKb.Equals(supersedence.SupersedingKb.Replace("KB", ""), StringComparison.OrdinalIgnoreCase) ||
+                            ("KB" + installedKb).Equals(supersedence.SupersedingKb, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            supersedenceInfo.Add(new SupersedenceInfo
+                            {
+                                RequiredKb = requiredKb,
+                                SupersedingKb = supersedence.SupersedingKb,
+                                ComplianceReason = "Superseding KB"
+                            });
+                            break; // Only need one superseding KB per required KB
+                        }
+                    }
+                }
+            }
+
+            return supersedenceInfo;
         }
 
         /// <summary>

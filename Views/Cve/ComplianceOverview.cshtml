@@ -187,6 +187,27 @@
                                     }
                                 </td>
                             </tr>
+                            @if (server.IsCompliant && server.SupersedenceDetails.Any(s => s.ComplianceReason == "Superseding KB"))
+                            {
+                                <tr class="table-light">
+                                    <td colspan="5" class="ps-4">
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i>
+                                            <strong>Compliance via supersedence:</strong>
+                                            @foreach (var supersedence in server.SupersedenceDetails.Where(s => s.ComplianceReason == "Superseding KB"))
+                                            {
+                                                <span class="ms-2">
+                                                    Required @supersedence.RequiredKb → Installed @supersedence.SupersedingKb
+                                                </span>
+                                                @if (supersedence != server.SupersedenceDetails.Where(s => s.ComplianceReason == "Superseding KB").Last())
+                                                {
+                                                    <span>;</span>
+                                                }
+                                            }
+                                        </small>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>

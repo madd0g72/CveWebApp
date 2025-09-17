@@ -303,6 +303,55 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
             Details = "CVE-2024-77777",
             BaseScore = 8.2m,
             CustomerActionRequired = true
+        },
+        // CVE-2025-29833 - Critical vulnerability requiring KB5058383
+        new CveUpdateStaging
+        {
+            ReleaseDate = new DateTime(2025, 1, 14),
+            ProductFamily = "Windows",
+            Product = "Windows 10",
+            Platform = "x64",
+            Impact = "Critical",
+            MaxSeverity = "Critical",
+            Article = "KB5058383",
+            Supercedence = "KB5059123;KB5060001",
+            Details = "CVE-2025-29833",
+            DetailsLink = "https://msrc.microsoft.com/cve-2025-29833",
+            BaseScore = 9.8m,
+            TemporalScore = 8.5m,
+            CustomerActionRequired = true
+        },
+        new CveUpdateStaging
+        {
+            ReleaseDate = new DateTime(2025, 1, 14),
+            ProductFamily = "Windows",
+            Product = "Windows 11",
+            Platform = "x64",
+            Impact = "Critical",
+            MaxSeverity = "Critical",
+            Article = "KB5058383",
+            Supercedence = "KB5059123;KB5060001",
+            Details = "CVE-2025-29833",
+            DetailsLink = "https://msrc.microsoft.com/cve-2025-29833",
+            BaseScore = 9.8m,
+            TemporalScore = 8.5m,
+            CustomerActionRequired = true
+        },
+        new CveUpdateStaging
+        {
+            ReleaseDate = new DateTime(2025, 1, 14),
+            ProductFamily = "Windows",
+            Product = "Windows Server 2019",
+            Platform = "x64",
+            Impact = "Critical",
+            MaxSeverity = "Critical",
+            Article = "KB5058383",
+            Supercedence = "KB5059123;KB5060001",
+            Details = "CVE-2025-29833",
+            DetailsLink = "https://msrc.microsoft.com/cve-2025-29833",
+            BaseScore = 9.8m,
+            TemporalScore = 8.5m,
+            CustomerActionRequired = true
         }
     };
 
@@ -315,11 +364,15 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
         new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5001234" },
         new ServerInstalledKb { Computer = "WIN10-SRV-01", OSProduct = "Windows 10 Enterprise", KB = "5000123" },
         new ServerInstalledKb { Computer = "WIN10-SRV-02", OSProduct = "Windows 10 Pro", KB = "5000456" },
+        new ServerInstalledKb { Computer = "WIN10-SRV-03", OSProduct = "Windows 10 Enterprise", KB = "5058383" }, // Has required KB for CVE-2025-29833
+        new ServerInstalledKb { Computer = "WIN10-SRV-04", OSProduct = "Windows 10 Pro", KB = "5059123" }, // Has superseding KB for CVE-2025-29833
         
         // Windows 11 servers
         new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5002345" },
         new ServerInstalledKb { Computer = "WIN11-SRV-01", OSProduct = "Windows 11 Enterprise", KB = "5001000" },
         new ServerInstalledKb { Computer = "WIN11-SRV-02", OSProduct = "Windows 11 Pro", KB = "5001001" },
+        new ServerInstalledKb { Computer = "WIN11-SRV-03", OSProduct = "Windows 11 Enterprise", KB = "5058383" }, // Has required KB for CVE-2025-29833
+        new ServerInstalledKb { Computer = "WIN11-SRV-04", OSProduct = "Windows 11 Pro", KB = "5059123" }, // Has superseding KB for CVE-2025-29833
         
         // Office servers
         new ServerInstalledKb { Computer = "OFFICE-SRV-01", OSProduct = "Microsoft Office 2019", KB = "5003456" },
@@ -328,6 +381,8 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
         // Windows Server 2019
         new ServerInstalledKb { Computer = "WS2019-SRV-01", OSProduct = "Windows Server 2019", KB = "5004567" },
         new ServerInstalledKb { Computer = "WS2019-SRV-02", OSProduct = "Windows Server 2019", KB = "5004567" },
+        new ServerInstalledKb { Computer = "WS2019-SRV-03", OSProduct = "Windows Server 2019", KB = "5058383" }, // Has required KB for CVE-2025-29833
+        new ServerInstalledKb { Computer = "WS2019-SRV-04", OSProduct = "Windows Server 2019", KB = "5059123" }, // Has superseding KB for CVE-2025-29833
         
         // Office 2021 servers
         new ServerInstalledKb { Computer = "O365-SRV-01", OSProduct = "Microsoft Office 2021", KB = "5005678" },
@@ -365,6 +420,56 @@ async Task SeedTestDataAsync(ApplicationDbContext context)
             Product = "Windows 11", 
             ProductFamily = "Windows",
             DateAdded = DateTime.UtcNow 
+        },
+        // CVE-2025-29833 supersedence chain - KB5059123 supersedes KB5058383
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5058383", 
+            SupersedingKb = "KB5059123", 
+            Product = "Windows 10", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 2, 11) 
+        },
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5058383", 
+            SupersedingKb = "KB5059123", 
+            Product = "Windows 11", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 2, 11) 
+        },
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5058383", 
+            SupersedingKb = "KB5059123", 
+            Product = "Windows Server 2019", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 2, 11) 
+        },
+        // KB5060001 supersedes KB5059123 (and therefore also KB5058383)
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5059123", 
+            SupersedingKb = "KB5060001", 
+            Product = "Windows 10", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 3, 11) 
+        },
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5059123", 
+            SupersedingKb = "KB5060001", 
+            Product = "Windows 11", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 3, 11) 
+        },
+        new KbSupersedence 
+        { 
+            OriginalKb = "KB5059123", 
+            SupersedingKb = "KB5060001", 
+            Product = "Windows Server 2019", 
+            ProductFamily = "Windows",
+            DateAdded = new DateTime(2025, 3, 11) 
         }
     };
     
