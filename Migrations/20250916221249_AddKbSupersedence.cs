@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 #nullable disable
 
@@ -16,10 +17,10 @@ namespace CveWebApp.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     OriginalKb = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     SupersedingKb = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    DateAdded = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    DateAdded = table.Column<DateTime>(type: "datetime", nullable: false),
                     Product = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     ProductFamily = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true)
                 },
