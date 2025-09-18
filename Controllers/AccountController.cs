@@ -20,6 +20,7 @@ namespace CveWebApp.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IActiveDirectoryService _activeDirectoryService;
         private readonly IUserProvisioningService _userProvisioningService;
+        private readonly IActiveDirectoryLoggingService _adLoggingService;
         private readonly ActiveDirectorySettings _adSettings;
 
         public AccountController(
@@ -30,6 +31,7 @@ namespace CveWebApp.Controllers
             IWebHostEnvironment environment,
             IActiveDirectoryService activeDirectoryService,
             IUserProvisioningService userProvisioningService,
+            IActiveDirectoryLoggingService adLoggingService,
             IOptions<ActiveDirectorySettings> adSettings)
         {
             _userManager = userManager;
@@ -39,6 +41,7 @@ namespace CveWebApp.Controllers
             _environment = environment;
             _activeDirectoryService = activeDirectoryService;
             _userProvisioningService = userProvisioningService;
+            _adLoggingService = adLoggingService;
             _adSettings = adSettings.Value;
         }
 
@@ -69,12 +72,26 @@ namespace CveWebApp.Controllers
                 // Try Active Directory authentication first if enabled
                 if (_adSettings.Enabled && _activeDirectoryService.IsConfigured)
                 {
-                    var adResult = await _activeDirectoryService.AuthenticateUserAsync(model.Email, model.Password);
+                    // For AD authentication, treat the input as sAMAccountName if it doesn't contain @
+                    // or extract the sAMAccountName part if it's in domain\username or username@domain format
+                    string adUsername = model.Email;
+                    if (model.Email.Contains("@"))
+                    {
+                        // Extract sAMAccountName from email format (username@domain -> username)
+                        adUsername = model.Email.Split('@')[0];
+                    }
+                    else if (model.Email.Contains("\\"))
+                    {
+                        // Extract sAMAccountName from domain\username format
+                        adUsername = model.Email.Split('\\')[1];
+                    }
+
+                    var adResult = await _activeDirectoryService.AuthenticateUserAsync(adUsername, model.Password);
                     
                     if (adResult.IsSuccessful)
                     {
                         // Provision or update the AD user in local database
-                        user = await _userProvisioningService.ProvisionAdUserAsync(adResult, model.Email);
+                        user = await _userProvisioningService.ProvisionAdUserAsync(adResult, adUsername);
                         
                         if (user != null)
                         {
@@ -83,17 +100,25 @@ namespace CveWebApp.Controllers
                             result = Microsoft.AspNetCore.Identity.SignInResult.Success;
                             authenticationMethod = "Active Directory";
                             
-                            // Log successful AD login
+                            // Log successful AD login with enhanced details
                             await LogLoginAttemptAsync(model.Email, user.Email, sourceIP, userAgent, true, null);
                             
                             await _fileLoggingService.LogActionAsync(
                                 "User Login (AD)", 
-                                user.Email ?? model.Email, 
-                                $"Successful AD authentication from {sourceIP}", 
+                                user.Email ?? adUsername, 
+                                $"Successful AD authentication for sAMAccountName '{adUsername}' from {sourceIP}. User provisioned with roles: {string.Join(", ", await _userManager.GetRolesAsync(user))}", 
                                 sourceIP);
+
+                            // Log the AD authentication with detailed information
+                            await _adLoggingService.LogAuthenticationAsync(adUsername, true, null, sourceIP);
                             
                             return RedirectToLocal(returnUrl);
                         }
+                    }
+                    else
+                    {
+                        // Log failed AD authentication attempt
+                        await _adLoggingService.LogAuthenticationAsync(adUsername, false, adResult.ErrorMessage, sourceIP);
                     }
                 }
 

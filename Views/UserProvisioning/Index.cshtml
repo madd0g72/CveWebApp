@@ -113,7 +113,7 @@
     <div class="row">
         <div class="col-12">
             <h3>Current Application Users</h3>
-            <p class="text-muted">Manage existing user accounts and roles.</p>
+            <p class="text-muted">Manage existing local user accounts and roles.</p>
             
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
@@ -168,6 +168,171 @@
                         }
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.IsAdConfigured && (Model.AdAdminUsers.Any() || Model.AdUserGroupUsers.Any()))
+{
+    <hr class="my-4" />
+    
+    <div class="row">
+        <div class="col-12">
+            <h3>Active Directory Users by Group Membership</h3>
+            <p class="text-muted">
+                <i class="fas fa-shield-alt text-success"></i>
+                Users automatically receive roles based on their AD group membership when they first log in.
+            </p>
+            
+            @if (Model.AdAdminUsers.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-users-cog"></i> Admin Role Group: @Model.AdAdminGroupName
+                        </h5>
+                        <small>Users in this AD group will receive the "Admin" role when they log in</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Username (sAMAccountName)</th>
+                                        <th>Display Name</th>
+                                        <th>Email</th>
+                                        <th>Local Status</th>
+                                        <th>Local Roles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in Model.AdAdminUsers)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <code>@user.Username</code>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    <span class="badge bg-success ms-1">Provisioned</span>
+                                                }
+                                            </td>
+                                            <td>@user.DisplayName</td>
+                                            <td>@user.Email</td>
+                                            <td>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    <span class="text-success"><i class="fas fa-check-circle"></i> Provisioned</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted"><i class="fas fa-clock"></i> Will be provisioned on first login</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    @foreach (var role in user.LocalRoles.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                                    {
+                                                        <span class="badge bg-@(role.Trim() == "Admin" ? "danger" : role.Trim() == "operator" ? "warning" : "primary") me-1">@role.Trim()</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Admin (on first login)</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+            
+            @if (Model.AdUserGroupUsers.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-users"></i> User Role Group: @Model.AdUserGroupName
+                        </h5>
+                        <small>Users in this AD group will receive the "User" role when they log in</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Username (sAMAccountName)</th>
+                                        <th>Display Name</th>
+                                        <th>Email</th>
+                                        <th>Local Status</th>
+                                        <th>Local Roles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in Model.AdUserGroupUsers)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <code>@user.Username</code>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    <span class="badge bg-success ms-1">Provisioned</span>
+                                                }
+                                            </td>
+                                            <td>@user.DisplayName</td>
+                                            <td>@user.Email</td>
+                                            <td>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    <span class="text-success"><i class="fas fa-check-circle"></i> Provisioned</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted"><i class="fas fa-clock"></i> Will be provisioned on first login</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.IsProvisioned)
+                                                {
+                                                    @foreach (var role in user.LocalRoles.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                                    {
+                                                        <span class="badge bg-@(role.Trim() == "Admin" ? "danger" : role.Trim() == "operator" ? "warning" : "primary") me-1">@role.Trim()</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-primary">User (on first login)</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+else if (Model.IsAdConfigured)
+{
+    <hr class="my-4" />
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5 class="alert-heading">
+                    <i class="fas fa-info-circle"></i> Active Directory Integration Enabled
+                </h5>
+                <p class="mb-0">
+                    Active Directory authentication is configured, but no group members were found or an error occurred while querying AD groups.
+                    Users will still be able to authenticate via AD and will be automatically provisioned on first login.
+                </p>
             </div>
         </div>
     </div>

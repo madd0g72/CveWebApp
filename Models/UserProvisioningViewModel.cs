@@ -39,6 +39,43 @@ namespace CveWebApp.Models
         /// List of existing users for management
         /// </summary>
         public List<UserManagementItem> ExistingUsers { get; set; } = new List<UserManagementItem>();
+
+        /// <summary>
+        /// AD users in Admin group (if AD is configured)
+        /// </summary>
+        public List<AdUserDisplayInfo> AdAdminUsers { get; set; } = new List<AdUserDisplayInfo>();
+
+        /// <summary>
+        /// AD users in User group (if AD is configured)
+        /// </summary>
+        public List<AdUserDisplayInfo> AdUserGroupUsers { get; set; } = new List<AdUserDisplayInfo>();
+
+        /// <summary>
+        /// Whether AD integration is configured and enabled
+        /// </summary>
+        public bool IsAdConfigured { get; set; }
+
+        /// <summary>
+        /// AD Admin group name for display
+        /// </summary>
+        public string? AdAdminGroupName { get; set; }
+
+        /// <summary>
+        /// AD User group name for display
+        /// </summary>
+        public string? AdUserGroupName { get; set; }
+    }
+
+    /// <summary>
+    /// Information about an AD user for display in the provisioning interface
+    /// </summary>
+    public class AdUserDisplayInfo
+    {
+        public string Username { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public bool IsProvisioned { get; set; }
+        public string LocalRoles { get; set; } = string.Empty;
     }
 
     /// <summary>

@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using CveWebApp.Models;
+using CveWebApp.Services;
 
 namespace CveWebApp.Controllers
 {
@@ -14,11 +16,19 @@ namespace CveWebApp.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IActiveDirectoryService _activeDirectoryService;
+        private readonly ActiveDirectorySettings _adSettings;
 
-        public UserProvisioningController(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+        public UserProvisioningController(
+            UserManager<ApplicationUser> userManager, 
+            RoleManager<IdentityRole> roleManager,
+            IActiveDirectoryService activeDirectoryService,
+            IOptions<ActiveDirectorySettings> adSettings)
         {
             _userManager = userManager;
             _roleManager = roleManager;
+            _activeDirectoryService = activeDirectoryService;
+            _adSettings = adSettings.Value;
         }
 
         // GET: UserProvisioning
@@ -28,6 +38,9 @@ namespace CveWebApp.Controllers
             
             // Load existing users
             await LoadExistingUsersAsync(model);
+            
+            // Load AD group members if AD is configured
+            await LoadAdGroupMembersAsync(model);
             
             return View(model);
         }
@@ -211,6 +224,92 @@ namespace CveWebApp.Controllers
 
             // Sort by creation date, newest first
             model.ExistingUsers = model.ExistingUsers.OrderByDescending(u => u.CreatedAt).ToList();
+        }
+
+        private async Task LoadAdGroupMembersAsync(UserProvisioningViewModel model)
+        {
+            // Check if AD is configured
+            model.IsAdConfigured = _adSettings.Enabled && _activeDirectoryService.IsConfigured;
+            
+            if (!model.IsAdConfigured)
+            {
+                return;
+            }
+
+            try
+            {
+                // Set group names for display
+                model.AdAdminGroupName = ExtractGroupName(_adSettings.AdminGroupDn);
+                model.AdUserGroupName = ExtractGroupName(_adSettings.UserGroupDn);
+
+                // Load admin group members
+                if (!string.IsNullOrEmpty(_adSettings.AdminGroupDn))
+                {
+                    var adminUsers = await _activeDirectoryService.GetUsersByGroupMembershipAsync(_adSettings.AdminGroupDn);
+                    foreach (var adUser in adminUsers)
+                    {
+                        var localUser = await _userManager.FindByNameAsync(adUser.Username);
+                        var displayInfo = new AdUserDisplayInfo
+                        {
+                            Username = adUser.Username,
+                            DisplayName = adUser.DisplayName,
+                            Email = adUser.Email,
+                            IsProvisioned = localUser != null,
+                            LocalRoles = localUser != null ? string.Join(", ", await _userManager.GetRolesAsync(localUser)) : "Not provisioned"
+                        };
+                        model.AdAdminUsers.Add(displayInfo);
+                    }
+                }
+
+                // Load user group members
+                if (!string.IsNullOrEmpty(_adSettings.UserGroupDn))
+                {
+                    var userGroupUsers = await _activeDirectoryService.GetUsersByGroupMembershipAsync(_adSettings.UserGroupDn);
+                    foreach (var adUser in userGroupUsers)
+                    {
+                        var localUser = await _userManager.FindByNameAsync(adUser.Username);
+                        var displayInfo = new AdUserDisplayInfo
+                        {
+                            Username = adUser.Username,
+                            DisplayName = adUser.DisplayName,
+                            Email = adUser.Email,
+                            IsProvisioned = localUser != null,
+                            LocalRoles = localUser != null ? string.Join(", ", await _userManager.GetRolesAsync(localUser)) : "Not provisioned"
+                        };
+                        model.AdUserGroupUsers.Add(displayInfo);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Log error but don't fail the page load
+                // The users can still manage local users even if AD group lookup fails
+            }
+        }
+
+        private static string? ExtractGroupName(string? groupDn)
+        {
+            if (string.IsNullOrEmpty(groupDn))
+                return null;
+
+            // Extract group name from DN (e.g., "CN=CVE-Admins,CN=Users,DC=company,DC=local" -> "CVE-Admins")
+            var cnIndex = groupDn.IndexOf("CN=", StringComparison.OrdinalIgnoreCase);
+            if (cnIndex >= 0)
+            {
+                var start = cnIndex + 3; // Skip "CN="
+                var commaIndex = groupDn.IndexOf(',', start);
+                if (commaIndex > start)
+                {
+                    return groupDn.Substring(start, commaIndex - start);
+                }
+                else
+                {
+                    // No comma found, take the rest
+                    return groupDn.Substring(start);
+                }
+            }
+
+            return groupDn; // Fallback to full DN if parsing fails
         }
     }
 }

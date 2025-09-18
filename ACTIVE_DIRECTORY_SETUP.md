@@ -41,6 +41,70 @@ Add the following section to your `appsettings.json` file:
 }
 ```
 
+## Active Directory Logging
+
+The application now includes dedicated logging for all AD operations, providing comprehensive audit trails and troubleshooting capabilities.
+
+### AD Log Types
+
+1. **Authentication Logs**: Every AD login attempt (successful or failed)
+2. **User Lookup Logs**: AD user search operations
+3. **Group Membership Logs**: AD group queries and membership retrieval
+4. **Provisioning Logs**: User creation and updates from AD
+5. **Operation Logs**: General AD operations and errors
+
+### Log File Location
+
+- **Development**: `Logs/activedirectory.log`
+- **Production**: `/var/log/cvewebapp/activedirectory.log`
+
+### Log Entry Format
+
+```json
+{
+  "Timestamp": "2025-09-18T12:00:00.000Z",
+  "Type": "ActiveDirectory",
+  "Operation": "AD Authentication Success",
+  "Username": "jdoe",
+  "Details": "User 'jdoe' successfully authenticated via Active Directory",
+  "SourceIP": "192.168.1.100",
+  "Environment": "Production"
+}
+```
+
+## User Provisioning Enhancements
+
+The User Provisioning page now displays AD users based on their group membership, providing administrators with visibility into who has access through AD.
+
+### Features
+
+- **Real-time AD Group Member Display**: Shows users from configured AD groups
+- **Provisioning Status**: Indicates which AD users have been provisioned locally
+- **Role Mapping Visibility**: Shows what roles users will receive
+- **sAMAccountName Display**: Clearly shows the username format for AD authentication
+
+### Group Member Sections
+
+1. **Admin Role Group**: Users from `AdminGroupDn` who will receive Admin role
+2. **User Role Group**: Users from `UserGroupDn` who will receive User role
+3. **Provisioning Status**: Shows if AD users have logged in and been provisioned
+
+## Production-Ready Features
+
+### Enhanced Login Authentication
+
+- **sAMAccountName Authentication**: Users login with their domain username (not email)
+- **Flexible Input Parsing**: Accepts `username`, `domain\username`, or `username@domain` formats
+- **Clear User Instructions**: Login form provides guidance on username format
+- **Enhanced Logging**: All AD authentications are logged with detailed information
+
+### Security Improvements
+
+- **Comprehensive Audit Trail**: All AD operations are logged separately
+- **Failed Authentication Tracking**: Failed AD login attempts are logged with reasons
+- **Group Membership Monitoring**: AD group queries are logged for security auditing
+- **User Provisioning Tracking**: All user creation/updates from AD are logged
+
 ### Configuration Properties
 
 | Property | Description | Default | Required |
@@ -61,6 +125,15 @@ Add the following section to your `appsettings.json` file:
 | `AdminGroupDn` | AD group for Admin role | - | No |
 | `UserGroupDn` | AD group for User role | - | No |
 | `AllowLocalUserFallback` | Allow local authentication fallback | `true` | No |
+
+### File Logging Configuration
+
+| Property | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `Enabled` | Whether file logging is enabled | `false` | No |
+| `ActiveDirectoryLogPath` | Path for AD operations log | `Logs/activedirectory.log` | No |
+| `ActionLogPath` | Path for general action log | `Logs/actions.log` | No |
+| `ErrorLogPath` | Path for error log | `Logs/errors.log` | No |
 
 ## Active Directory Setup
 
@@ -101,16 +174,17 @@ For production environments, ensure proper SSL certificates are configured on yo
 
 ## Authentication Flow
 
-1. User submits credentials via login form
+1. User submits credentials via login form using **sAMAccountName** (not email format)
 2. If AD is enabled, attempt AD authentication first:
    - Service account binds to AD
    - User lookup by sAMAccountName
    - User credential validation via LDAP bind
-   - Group membership retrieval
+   - Group membership retrieval and logging
 3. If AD authentication succeeds:
    - User is provisioned/updated in local database
    - Roles are assigned based on AD groups
    - User is signed in
+   - **Detailed AD operations are logged to dedicated AD log file**
 4. If AD authentication fails and local fallback is enabled:
    - Attempt local database authentication
 5. If both fail, display error message

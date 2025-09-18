@@ -37,6 +37,9 @@ builder.Services.AddControllersWithViews();
 // Add file logging service
 builder.Services.AddScoped<CveWebApp.Services.IFileLoggingService, CveWebApp.Services.FileLoggingService>();
 
+// Add Active Directory logging service
+builder.Services.AddScoped<CveWebApp.Services.IActiveDirectoryLoggingService, CveWebApp.Services.ActiveDirectoryLoggingService>();
+
 // Configure Active Directory settings
 builder.Services.Configure<ActiveDirectorySettings>(
     builder.Configuration.GetSection("ActiveDirectory"));

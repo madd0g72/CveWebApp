@@ -27,7 +27,7 @@
                         <label asp-for="Email" class="form-label">
                             @if (adEnabled)
                             {
-                                <text>Username or Email</text>
+                                <text>Username</text>
                             }
                             else
                             {
@@ -36,8 +36,15 @@
                         </label>
                         <input asp-for="Email" class="form-control" 
                                type="@(adEnabled ? "text" : "email")" 
-                               placeholder="@(adEnabled ? "Enter your domain username or email" : "Enter your email")" />
+                               placeholder="@(adEnabled ? "Enter your domain username (sAMAccountName)" : "Enter your email")" />
                         <span asp-validation-for="Email" class="text-danger"></span>
+                        @if (adEnabled)
+                        {
+                            <div class="form-text">
+                                <i class="fas fa-info-circle"></i> 
+                                Enter your sAMAccountName (e.g., 'jdoe' not 'john.doe@company.com')
+                            </div>
+                        }
                     </div>
                     
                     <div class="mb-3">
@@ -96,6 +103,7 @@
                             @if (adEnabled)
                             {
                                 <strong>Use your domain credentials</strong><br>
+                                <em>Username: sAMAccountName (not email format)</em><br>
                                 @if (AdSettings.Value.AllowLocalUserFallback)
                                 {
                                     <em>Local fallback available for emergencies</em>
