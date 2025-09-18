@@ -17,6 +17,7 @@
     </PackageReference>
 
     <PackageReference Include="QuestPDF" Version="2025.7.1" />
+    <PackageReference Include="System.DirectoryServices.Protocols" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

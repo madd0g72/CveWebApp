@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using CveWebApp.Models;
 using CveWebApp.Data;
 using CveWebApp.Services;
+using Microsoft.Extensions.Options;
 
 namespace CveWebApp.Controllers
 {
@@ -17,14 +18,28 @@ namespace CveWebApp.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IFileLoggingService _fileLoggingService;
         private readonly IWebHostEnvironment _environment;
+        private readonly IActiveDirectoryService _activeDirectoryService;
+        private readonly IUserProvisioningService _userProvisioningService;
+        private readonly ActiveDirectorySettings _adSettings;
 
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ApplicationDbContext context, IFileLoggingService fileLoggingService, IWebHostEnvironment environment)
+        public AccountController(
+            UserManager<ApplicationUser> userManager, 
+            SignInManager<ApplicationUser> signInManager, 
+            ApplicationDbContext context, 
+            IFileLoggingService fileLoggingService, 
+            IWebHostEnvironment environment,
+            IActiveDirectoryService activeDirectoryService,
+            IUserProvisioningService userProvisioningService,
+            IOptions<ActiveDirectorySettings> adSettings)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
             _fileLoggingService = fileLoggingService;
             _environment = environment;
+            _activeDirectoryService = activeDirectoryService;
+            _userProvisioningService = userProvisioningService;
+            _adSettings = adSettings.Value;
         }
 
         // GET: Account/Login
@@ -45,33 +60,77 @@ namespace CveWebApp.Controllers
             
             if (ModelState.IsValid)
             {
-                // First try to login with the provided value as username
-                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
-                
-                // If that fails and the input looks like an email, try to find user by email and use their username
-                if (!result.Succeeded && model.Email.Contains("@"))
-                {
-                    var userByEmail = await _userManager.FindByEmailAsync(model.Email);
-                    if (userByEmail != null)
-                    {
-                        result = await _signInManager.PasswordSignInAsync(userByEmail.UserName!, model.Password, model.RememberMe, lockoutOnFailure: false);
-                    }
-                }
-                
-                var user = await _userManager.FindByEmailAsync(model.Email);
                 var sourceIP = GetClientIpAddress();
                 var userAgent = Request.Headers.UserAgent.ToString();
+                ApplicationUser? user = null;
+                Microsoft.AspNetCore.Identity.SignInResult result = Microsoft.AspNetCore.Identity.SignInResult.Failed;
+                string? authenticationMethod = null;
 
-                if (result.Succeeded)
+                // Try Active Directory authentication first if enabled
+                if (_adSettings.Enabled && _activeDirectoryService.IsConfigured)
+                {
+                    var adResult = await _activeDirectoryService.AuthenticateUserAsync(model.Email, model.Password);
+                    
+                    if (adResult.IsSuccessful)
+                    {
+                        // Provision or update the AD user in local database
+                        user = await _userProvisioningService.ProvisionAdUserAsync(adResult, model.Email);
+                        
+                        if (user != null)
+                        {
+                            // Sign in the user without password validation (since AD already validated)
+                            await _signInManager.SignInAsync(user, model.RememberMe);
+                            result = Microsoft.AspNetCore.Identity.SignInResult.Success;
+                            authenticationMethod = "Active Directory";
+                            
+                            // Log successful AD login
+                            await LogLoginAttemptAsync(model.Email, user.Email, sourceIP, userAgent, true, null);
+                            
+                            await _fileLoggingService.LogActionAsync(
+                                "User Login (AD)", 
+                                user.Email ?? model.Email, 
+                                $"Successful AD authentication from {sourceIP}", 
+                                sourceIP);
+                            
+                            return RedirectToLocal(returnUrl);
+                        }
+                    }
+                }
+
+                // If AD authentication failed or is disabled, try local authentication (if allowed)
+                if (!result.Succeeded && (_adSettings.AllowLocalUserFallback || !_adSettings.Enabled))
+                {
+                    // First try to login with the provided value as username
+                    result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
+                    
+                    // If that fails and the input looks like an email, try to find user by email and use their username
+                    if (!result.Succeeded && model.Email.Contains("@"))
+                    {
+                        var userByEmail = await _userManager.FindByEmailAsync(model.Email);
+                        if (userByEmail != null && !userByEmail.IsActiveDirectoryUser)
+                        {
+                            result = await _signInManager.PasswordSignInAsync(userByEmail.UserName!, model.Password, model.RememberMe, lockoutOnFailure: false);
+                            user = userByEmail;
+                        }
+                    }
+                    
+                    if (user == null)
+                    {
+                        user = await _userManager.FindByEmailAsync(model.Email);
+                    }
+                    
+                    authenticationMethod = "Local Database";
+                }
+
+                if (result.Succeeded && user != null)
                 {
                     // Log successful login
-                    await LogLoginAttemptAsync(model.Email, user?.Email, sourceIP, userAgent, true, null);
+                    await LogLoginAttemptAsync(model.Email, user.Email, sourceIP, userAgent, true, null);
                     
-                    // Log to file
                     await _fileLoggingService.LogActionAsync(
-                        "User Login", 
-                        user?.Email ?? model.Email, 
-                        $"Successful login from {sourceIP}", 
+                        $"User Login ({authenticationMethod})", 
+                        user.Email ?? model.Email, 
+                        $"Successful {authenticationMethod?.ToLower()} authentication from {sourceIP}", 
                         sourceIP);
                     
                     return RedirectToLocal(returnUrl);
@@ -89,14 +148,15 @@ namespace CveWebApp.Controllers
                     // Log failed login
                     await LogLoginAttemptAsync(model.Email, user?.Email, sourceIP, userAgent, false, failureReason);
                     
-                    // Log to file
                     await _fileLoggingService.LogActionAsync(
                         "Failed Login Attempt", 
                         user?.Email ?? model.Email, 
                         $"Failed login from {sourceIP}: {failureReason}", 
                         sourceIP);
                     
-                    ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                    ModelState.AddModelError(string.Empty, _adSettings.Enabled && _activeDirectoryService.IsConfigured 
+                        ? "Invalid login attempt. Please check your domain credentials." 
+                        : "Invalid login attempt.");
                 }
             }
 
@@ -152,7 +212,16 @@ namespace CveWebApp.Controllers
                     return RedirectToAction(nameof(ForgotPasswordConfirmation));
                 }
 
-                // Generate password reset token
+                // Check if this is an Active Directory user
+                if (user.IsActiveDirectoryUser)
+                {
+                    // AD users cannot reset passwords through the application
+                    ModelState.AddModelError(string.Empty, 
+                        "Password reset is not available for Active Directory users. Please contact your system administrator or use your organization's password reset process.");
+                    return View(model);
+                }
+
+                // Generate password reset token for local users only
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
                 
                 if (_environment.IsDevelopment())
@@ -216,6 +285,15 @@ namespace CveWebApp.Controllers
             {
                 // Don't reveal that the user does not exist
                 return RedirectToAction(nameof(ResetPasswordConfirmation));
+            }
+
+            // Check if this is an Active Directory user
+            if (user.IsActiveDirectoryUser)
+            {
+                // AD users cannot reset passwords through the application
+                ModelState.AddModelError(string.Empty, 
+                    "Password reset is not available for Active Directory users. Please contact your system administrator.");
+                return View(model);
             }
 
             var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);

@@ -37,6 +37,14 @@ builder.Services.AddControllersWithViews();
 // Add file logging service
 builder.Services.AddScoped<CveWebApp.Services.IFileLoggingService, CveWebApp.Services.FileLoggingService>();
 
+// Configure Active Directory settings
+builder.Services.Configure<ActiveDirectorySettings>(
+    builder.Configuration.GetSection("ActiveDirectory"));
+
+// Add Active Directory services
+builder.Services.AddScoped<IActiveDirectoryService, ActiveDirectoryService>();
+builder.Services.AddScoped<IUserProvisioningService, UserProvisioningService>();
+
 // Detect provider from config with environment-specific defaults
 var dbProvider = builder.Configuration["DatabaseProvider"];
 if (string.IsNullOrEmpty(dbProvider))

@@ -1,6 +1,10 @@
+@using Microsoft.Extensions.Options
+@using CveWebApp.Models
 @model LoginViewModel
+@inject IOptions<ActiveDirectorySettings> AdSettings
 @{
     ViewData["Title"] = "Login";
+    var adEnabled = AdSettings.Value.Enabled;
 }
 
 <div class="row justify-content-center">
@@ -8,14 +12,31 @@
         <div class="card">
             <div class="card-header">
                 <h4 class="mb-0">Login to CVE Dashboard</h4>
+                @if (adEnabled)
+                {
+                    <small class="text-muted">
+                        <i class="fas fa-shield-alt"></i> Active Directory authentication enabled
+                    </small>
+                }
             </div>
             <div class="card-body">
                 <form asp-action="Login" method="post">
                     <div asp-validation-summary="All" class="text-danger mb-3"></div>
                     
                     <div class="mb-3">
-                        <label asp-for="Email" class="form-label">Email</label>
-                        <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" />
+                        <label asp-for="Email" class="form-label">
+                            @if (adEnabled)
+                            {
+                                <text>Username or Email</text>
+                            }
+                            else
+                            {
+                                <text>Email</text>
+                            }
+                        </label>
+                        <input asp-for="Email" class="form-control" 
+                               type="@(adEnabled ? "text" : "email")" 
+                               placeholder="@(adEnabled ? "Enter your domain username or email" : "Enter your email")" />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
                     
@@ -34,9 +55,22 @@
                         <button type="submit" class="btn btn-primary">Login</button>
                     </div>
                     
-                    <div class="text-center mt-3">
-                        <a asp-action="ForgotPassword" class="text-decoration-none">Forgot Password?</a>
-                    </div>
+                    @if (!adEnabled || AdSettings.Value.AllowLocalUserFallback)
+                    {
+                        <div class="text-center mt-3">
+                            <a asp-action="ForgotPassword" class="text-decoration-none">Forgot Password?</a>
+                        </div>
+                    }
+                    
+                    @if (adEnabled)
+                    {
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                Active Directory users cannot reset passwords here.<br>
+                                Contact your system administrator for password assistance.
+                            </small>
+                        </div>
+                    }
                 </form>
                 
                 @* Show credentials info based on environment *@
@@ -45,8 +79,12 @@
                     <div class="mt-4 p-3 bg-light rounded">
                         <h6>Development Demo Credentials</h6>
                         <small class="text-muted">
-                            <strong>Admin:</strong> admin@cveapp.local / admin123<br>
-                            <strong>User:</strong> user@cveapp.local / user123
+                            <strong>Local Admin:</strong> admin@cveapp.local / admin123<br>
+                            <strong>Local User:</strong> user@cveapp.local / user123
+                            @if (adEnabled)
+                            {
+                                <br><em class="text-info">AD authentication is enabled but will fall back to local users in development.</em>
+                            }
                         </small>
                     </div>
                 }
@@ -55,8 +93,19 @@
                     <div class="mt-4 p-3 bg-warning bg-opacity-25 rounded">
                         <h6 class="text-warning">Production Environment</h6>
                         <small class="text-muted">
-                            <strong>Default Admin:</strong> admin@company.local<br>
-                            <em>Use "Forgot Password" to reset if needed</em>
+                            @if (adEnabled)
+                            {
+                                <strong>Use your domain credentials</strong><br>
+                                @if (AdSettings.Value.AllowLocalUserFallback)
+                                {
+                                    <em>Local fallback available for emergencies</em>
+                                }
+                            }
+                            else
+                            {
+                                <strong>Default Admin:</strong> <text>admin@company.local</text><br>
+                                <em>Use "Forgot Password" to reset if needed</em>
+                            }
                         </small>
                     </div>
                 }
