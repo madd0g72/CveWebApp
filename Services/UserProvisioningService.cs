@@ -23,17 +23,20 @@ namespace CveWebApp.Services
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ActiveDirectorySettings _adSettings;
         private readonly ILogger<UserProvisioningService> _logger;
+        private readonly IActiveDirectoryLoggingService _adLoggingService;
 
         public UserProvisioningService(
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IOptions<ActiveDirectorySettings> adSettings,
-            ILogger<UserProvisioningService> logger)
+            ILogger<UserProvisioningService> logger,
+            IActiveDirectoryLoggingService adLoggingService)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _adSettings = adSettings.Value;
             _logger = logger;
+            _adLoggingService = adLoggingService;
         }
 
         /// <summary>
@@ -85,10 +88,13 @@ namespace CveWebApp.Services
                     {
                         await _userManager.UpdateAsync(existingUser);
                         _logger.LogInformation("Updated AD user information for: {Username}", username);
+                        await _adLoggingService.LogOperationAsync("AD User Update", username, $"Updated existing user information from AD: {(string.IsNullOrEmpty(adResult.DisplayName) ? "No display name" : adResult.DisplayName)}");
                     }
 
                     // Update user roles based on AD group membership
                     await UpdateUserRolesAsync(existingUser, adResult);
+                    
+                    await _adLoggingService.LogOperationAsync("AD User Provision", username, $"Existing AD user provisioned successfully with roles: {string.Join(", ", await _userManager.GetRolesAsync(existingUser))}");
                     
                     return existingUser;
                 }
@@ -119,12 +125,15 @@ namespace CveWebApp.Services
                         // Assign roles based on AD group membership
                         await UpdateUserRolesAsync(newUser, adResult);
                         
+                        await _adLoggingService.LogOperationAsync("AD User Creation", username, $"New AD user created successfully with roles: {string.Join(", ", await _userManager.GetRolesAsync(newUser))}");
+                        
                         return newUser;
                     }
                     else
                     {
-                        _logger.LogError("Failed to create AD user {Username}: {Errors}", 
-                            username, string.Join(", ", result.Errors.Select(e => e.Description)));
+                        var errorMsg = string.Join(", ", result.Errors.Select(e => e.Description));
+                        _logger.LogError("Failed to create AD user {Username}: {Errors}", username, errorMsg);
+                        await _adLoggingService.LogOperationAsync("AD User Creation Failed", username, $"Failed to create new AD user: {errorMsg}");
                         return null;
                     }
                 }
@@ -132,6 +141,7 @@ namespace CveWebApp.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error provisioning AD user: {Username}", username);
+                await _adLoggingService.LogOperationAsync("AD User Provision Error", username, $"Error provisioning AD user: {ex.Message}");
                 return null;
             }
         }

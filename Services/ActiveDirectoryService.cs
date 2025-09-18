@@ -25,7 +25,19 @@ namespace CveWebApp.Services
     {
         Task<AdAuthenticationResult> AuthenticateUserAsync(string username, string password);
         Task<AdAuthenticationResult> GetUserDetailsAsync(string username);
+        Task<List<AdUserInfo>> GetUsersByGroupMembershipAsync(string groupDn);
         bool IsConfigured { get; }
+    }
+
+    /// <summary>
+    /// Information about an AD user for display purposes
+    /// </summary>
+    public class AdUserInfo
+    {
+        public string Username { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public List<string> GroupMemberships { get; set; } = new List<string>();
     }
 
     /// <summary>
@@ -35,11 +47,16 @@ namespace CveWebApp.Services
     {
         private readonly ActiveDirectorySettings _adSettings;
         private readonly ILogger<ActiveDirectoryService> _logger;
+        private readonly IActiveDirectoryLoggingService _adLoggingService;
 
-        public ActiveDirectoryService(IOptions<ActiveDirectorySettings> adSettings, ILogger<ActiveDirectoryService> logger)
+        public ActiveDirectoryService(
+            IOptions<ActiveDirectorySettings> adSettings, 
+            ILogger<ActiveDirectoryService> logger,
+            IActiveDirectoryLoggingService adLoggingService)
         {
             _adSettings = adSettings.Value;
             _logger = logger;
+            _adLoggingService = adLoggingService;
         }
 
         public bool IsConfigured => _adSettings.Enabled && 
@@ -55,19 +72,23 @@ namespace CveWebApp.Services
         {
             if (!IsConfigured)
             {
+                var errorMsg = "Active Directory is not configured";
+                await _adLoggingService.LogAuthenticationAsync(username, false, errorMsg);
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Active Directory is not configured" 
+                    ErrorMessage = errorMsg
                 };
             }
 
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
+                var errorMsg = "Username and password are required";
+                await _adLoggingService.LogAuthenticationAsync(username ?? "NULL", false, errorMsg);
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Username and password are required" 
+                    ErrorMessage = errorMsg
                 };
             }
 
@@ -77,10 +98,12 @@ namespace CveWebApp.Services
                 var userDetails = await GetUserDetailsAsync(username);
                 if (!userDetails.IsSuccessful || string.IsNullOrEmpty(userDetails.DistinguishedName))
                 {
+                    var errorMsg = "User not found in Active Directory";
+                    await _adLoggingService.LogAuthenticationAsync(username, false, errorMsg);
                     return new AdAuthenticationResult 
                     { 
                         IsSuccessful = false, 
-                        ErrorMessage = "User not found in Active Directory" 
+                        ErrorMessage = errorMsg
                     };
                 }
 
@@ -95,6 +118,12 @@ namespace CveWebApp.Services
 
                     _logger.LogInformation("AD authentication successful for user: {Username}", username);
                     
+                    // Log successful authentication
+                    await _adLoggingService.LogAuthenticationAsync(username, true);
+                    
+                    // Log group membership details
+                    await _adLoggingService.LogGroupMembershipQueryAsync(username, userDetails.GroupMemberships);
+                    
                     return new AdAuthenticationResult
                     {
                         IsSuccessful = true,
@@ -107,20 +136,24 @@ namespace CveWebApp.Services
             }
             catch (LdapException ex)
             {
+                var errorMsg = "Invalid username or password";
                 _logger.LogWarning("AD authentication failed for user {Username}: {Error}", username, ex.Message);
+                await _adLoggingService.LogAuthenticationAsync(username, false, errorMsg);
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Invalid username or password" 
+                    ErrorMessage = errorMsg
                 };
             }
             catch (Exception ex)
             {
+                var errorMsg = "Authentication service unavailable";
                 _logger.LogError(ex, "Unexpected error during AD authentication for user: {Username}", username);
+                await _adLoggingService.LogAuthenticationAsync(username, false, $"{errorMsg}: {ex.Message}");
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Authentication service unavailable" 
+                    ErrorMessage = errorMsg
                 };
             }
         }
@@ -132,10 +165,12 @@ namespace CveWebApp.Services
         {
             if (!IsConfigured)
             {
+                var errorMsg = "Active Directory is not configured";
+                await _adLoggingService.LogUserLookupAsync(username, false, errorMsg);
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Active Directory is not configured" 
+                    ErrorMessage = errorMsg
                 };
             }
 
@@ -166,10 +201,12 @@ namespace CveWebApp.Services
 
                     if (response.Entries.Count == 0)
                     {
+                        var errorMsg = "User not found";
+                        await _adLoggingService.LogUserLookupAsync(username, false, errorMsg);
                         return new AdAuthenticationResult 
                         { 
                             IsSuccessful = false, 
-                            ErrorMessage = "User not found" 
+                            ErrorMessage = errorMsg
                         };
                     }
 
@@ -191,18 +228,96 @@ namespace CveWebApp.Services
                             .ToList();
                     }
 
+                    // Log successful lookup
+                    await _adLoggingService.LogUserLookupAsync(username, true);
+
                     return result;
                 }
             }
             catch (Exception ex)
             {
+                var errorMsg = "Unable to retrieve user details";
                 _logger.LogError(ex, "Error retrieving user details for: {Username}", username);
+                await _adLoggingService.LogUserLookupAsync(username, false, $"{errorMsg}: {ex.Message}");
                 return new AdAuthenticationResult 
                 { 
                     IsSuccessful = false, 
-                    ErrorMessage = "Unable to retrieve user details" 
+                    ErrorMessage = errorMsg
                 };
             }
+        }
+        /// <summary>
+        /// Gets users who are members of a specific AD group
+        /// </summary>
+        public async Task<List<AdUserInfo>> GetUsersByGroupMembershipAsync(string groupDn)
+        {
+            var users = new List<AdUserInfo>();
+            
+            if (!IsConfigured || string.IsNullOrEmpty(groupDn))
+            {
+                await _adLoggingService.LogOperationAsync("AD Group Query Failed", "System", $"Cannot query group membership - AD not configured or group DN empty: {groupDn}");
+                return users;
+            }
+
+            try
+            {
+                using (var connection = CreateLdapConnection())
+                {
+                    // Bind with service account
+                    var serviceCredential = new NetworkCredential(_adSettings.ServiceAccountUsername, _adSettings.ServiceAccountPassword);
+                    connection.Credential = serviceCredential;
+                    
+                    await Task.Run(() => connection.Bind());
+
+                    // Search for users who are members of the specified group
+                    var searchFilter = $"(&(objectClass=user)(memberOf={groupDn}))";
+                    var searchRequest = new SearchRequest(
+                        _adSettings.BaseDn,
+                        searchFilter,
+                        SearchScope.Subtree,
+                        new[] { 
+                            "sAMAccountName",
+                            _adSettings.DisplayNameAttribute, 
+                            _adSettings.EmailAttribute, 
+                            _adSettings.GroupMembershipAttribute
+                        });
+
+                    var response = (SearchResponse)await Task.Run(() => connection.SendRequest(searchRequest));
+
+                    foreach (SearchResultEntry entry in response.Entries)
+                    {
+                        var userInfo = new AdUserInfo
+                        {
+                            Username = GetAttributeValue(entry, "sAMAccountName") ?? "",
+                            DisplayName = GetAttributeValue(entry, _adSettings.DisplayNameAttribute) ?? "",
+                            Email = GetAttributeValue(entry, _adSettings.EmailAttribute) ?? ""
+                        };
+
+                        // Get group memberships
+                        var groupAttribute = entry.Attributes[_adSettings.GroupMembershipAttribute];
+                        if (groupAttribute != null)
+                        {
+                            userInfo.GroupMemberships = groupAttribute.GetValues(typeof(string))
+                                .Cast<string>()
+                                .ToList();
+                        }
+
+                        if (!string.IsNullOrEmpty(userInfo.Username))
+                        {
+                            users.Add(userInfo);
+                        }
+                    }
+
+                    await _adLoggingService.LogOperationAsync("AD Group Query Success", "System", $"Retrieved {users.Count} users from group: {groupDn}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving users for group: {GroupDn}", groupDn);
+                await _adLoggingService.LogOperationAsync("AD Group Query Failed", "System", $"Error retrieving users for group {groupDn}: {ex.Message}");
+            }
+
+            return users;
         }
 
         /// <summary>
