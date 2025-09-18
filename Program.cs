@@ -175,8 +175,6 @@ using (var scope = app.Services.CreateScope())
     
     if (app.Environment.IsDevelopment())
     {
-        // Seed basic services for development
-        await SeedServicesAsync(context);
         // Removed automatic CSV data loading and test data seeding
         // All data population must now happen via admin import functionality
     }
@@ -272,22 +270,3 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
     }
 }
 
-/// <summary>
-/// Seeds basic services for development environments
-/// </summary>
-async Task SeedServicesAsync(ApplicationDbContext context)
-{
-    if (!context.Services.Any())
-    {
-        var services = new[]
-        {
-            new Service { ServiceName = "SQL Server", Description = "Microsoft SQL Server Database Engine", Vendor = "Microsoft" },
-            new Service { ServiceName = "Cynet", Description = "Cynet Security Platform", Vendor = "Cynet" },
-            new Service { ServiceName = "Wincollect", Description = "IBM QRadar WinCollect Agent", Vendor = "IBM" },
-            new Service { ServiceName = "SentinelOne", Description = "SentinelOne Endpoint Protection", Vendor = "SentinelOne" }
-        };
-
-        await context.Services.AddRangeAsync(services);
-        await context.SaveChangesAsync();
-    }
-}

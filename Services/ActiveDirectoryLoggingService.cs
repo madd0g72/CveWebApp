@@ -144,7 +144,8 @@ namespace CveWebApp.Services
         {
             var jsonOptions = new JsonSerializerOptions
             {
-                WriteIndented = false
+                WriteIndented = false,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
 
             var jsonLine = JsonSerializer.Serialize(logEntry, jsonOptions);
