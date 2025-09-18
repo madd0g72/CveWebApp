@@ -146,10 +146,9 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
     
-    // Only run migrations if using a relational database provider
+    // Validate environment and database provider alignment for relational databases
     if (!context.Database.IsInMemory())
     {
-        // Validate environment and database provider alignment for relational databases
         var currentProvider = context.Database.ProviderName;
         var expectedProvider = "Microsoft.EntityFrameworkCore.SqlServer";
         
@@ -160,32 +159,10 @@ using (var scope = app.Services.CreateScope())
                 $"Database provider mismatch! Production environment expects {expected} but got {currentProvider}. " +
                 "Check your appsettings configuration.");
         }
-        
-        // Check if database exists and has tables
-        var canConnect = await context.Database.CanConnectAsync();
-        if (canConnect)
-        {
-            // Check if any tables exist (look for AspNetUsers as it's always created)
-            var hasSchema = await context.Database.GetService<IRelationalDatabaseCreator>().HasTablesAsync();
-            
-            if (!hasSchema)
-            {
-                // Database exists but is empty - create schema using EnsureCreated for cross-provider compatibility
-                await context.Database.EnsureCreatedAsync();
-            }
-            // For SQL Server with existing schema, skip migrations as they may contain provider-specific code
-        }
-        else
-        {
-            // Database doesn't exist - create it using EnsureCreated for SQL Server
-            await context.Database.EnsureCreatedAsync();
-        }
     }
-    else
-    {
-        // For in-memory database, just ensure it's created
-        await context.Database.EnsureCreatedAsync();
-    }
+    
+    // Initialize database with proper schema handling for missing columns
+    await CveWebApp.Data.DatabaseInitializer.InitializeDatabaseAsync(context);
 
     // Always seed roles and admin user in all environments
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
