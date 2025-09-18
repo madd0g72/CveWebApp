@@ -5,9 +5,8 @@ This document provides clear instructions for setting up the CveWebApp in both d
 ## Environment Overview
 
 ### Development Environment
-- **Database Provider**: MariaDB/MySQL (with fallback to in-memory for testing)
+- **Database Provider**: In-memory database (for testing and development)
 - **Configuration File**: `appsettings.Development.json`
-- **Default Database**: `cvewebapp_dev`
 - **Features**: Test data seeding, debug logging, development user accounts
 
 ### Production Environment
@@ -20,33 +19,12 @@ This document provides clear instructions for setting up the CveWebApp in both d
 
 ### Development Setup
 
-1. **Option A: Using MariaDB/MySQL**
-   ```bash
-   # Install MariaDB/MySQL server locally
-   # Update appsettings.Development.json with your connection string:
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "server=localhost;database=cvewebapp_dev;user=root;password=yourpassword;"
-     }
-   }
-   
-   # Run the application
-   dotnet run --environment Development
-   ```
-
-2. **Option B: Using In-Memory Database (Default)**
-   ```bash
-   # No database setup required - uses in-memory database
-   # Ensure appsettings.Development.json has empty connection string:
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": ""
-     }
-   }
-   
-   # Run the application
-   dotnet run --environment Development
-   ```
+**Option: Using In-Memory Database (Default)**
+```bash
+# No database setup required - uses in-memory database
+# Run the application
+dotnet run --environment Development
+```
 
 ### Production Setup
 
@@ -82,7 +60,7 @@ This document provides clear instructions for setting up the CveWebApp in both d
     }
   },
   "AllowedHosts": "*",
-  "DatabaseProvider": "MariaDb",
+  "DatabaseProvider": "InMemory",
   "ConnectionStrings": {
     "DefaultConnection": ""
   }
@@ -99,7 +77,7 @@ This document provides clear instructions for setting up the CveWebApp in both d
     }
   },
   "AllowedHosts": "*",
-  "DatabaseProvider": "MariaDb",
+  "DatabaseProvider": "InMemory",
   "ConnectionStrings": {
     "DefaultConnection": ""
   }
@@ -125,28 +103,27 @@ This document provides clear instructions for setting up the CveWebApp in both d
 
 ## Database Migration Strategy
 
-The application uses an intelligent migration strategy:
+The application uses an intelligent database strategy:
 
-### For Development (MariaDB/MySQL)
-- Uses existing Entity Framework migrations
-- Automatically creates database schema on first run
-- Applies pending migrations on subsequent runs
+### For Development
+- Uses in-memory database for fast testing and development
+- Automatically creates database schema on first run using EnsureCreated()
+- No external database setup required
 
 ### For Production (SQL Server)
-- Uses `EnsureCreated()` to avoid MySQL-specific migration conflicts
+- Uses `EnsureCreated()` to create database schema
 - Creates database schema compatible with SQL Server
 - Idempotent - safe to run multiple times
 
 ### First Startup Behavior
-1. **Empty Database**: Creates all required tables and schema
-2. **Existing Database**: Checks for schema and applies updates as needed
-3. **No Database**: Creates database and schema automatically
+1. **Development**: Creates in-memory database with schema and test data
+2. **Production**: Creates SQL Server database with schema (no test data)
 
 ## Environment Validation
 
 The application includes built-in validation to prevent environment mismatches:
 
-- **Development**: Expects MariaDB/MySQL provider (or in-memory for testing)
+- **Development**: Always uses in-memory database
 - **Production**: Expects SQL Server provider
 - **Mismatch Error**: Throws clear error message if wrong provider is detected
 
@@ -198,9 +175,9 @@ Regular User:
    - Verify correct `appsettings.{Environment}.json` exists
    - Ensure `DatabaseProvider` matches expected provider
 
-3. **Migration Errors**
+3. **Schema Issues**
    - For SQL Server: Application uses EnsureCreated, not migrations
-   - For MySQL: Ensure MySQL server supports the features used
+   - For development: Uses in-memory database (no external dependencies)
    - Clear database and restart for clean schema
 
 ### Environment Variable Options

@@ -42,23 +42,21 @@ var dbProvider = builder.Configuration["DatabaseProvider"];
 if (string.IsNullOrEmpty(dbProvider))
 {
     // Set environment-specific defaults if not explicitly configured
-    dbProvider = builder.Environment.IsDevelopment() ? "MariaDb" : "SqlServer";
+    dbProvider = builder.Environment.IsDevelopment() ? "InMemory" : "SqlServer";
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    if (!string.IsNullOrEmpty(connectionString))
+    
+    // For development, always use in-memory database regardless of connection string
+    if (builder.Environment.IsDevelopment())
     {
-        if (dbProvider.Equals("MariaDb", StringComparison.OrdinalIgnoreCase))
-        {
-            options.UseMySql(
-                connectionString,
-                new MySqlServerVersion(new Version(10, 5, 0)),
-                mysqlOptions => mysqlOptions.EnableRetryOnFailure().CommandTimeout(30)
-            );
-        }
-        else if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+        options.UseInMemoryDatabase("TestDatabase");
+    }
+    else if (!string.IsNullOrEmpty(connectionString))
+    {
+        if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             options.UseSqlServer(
                 connectionString,
@@ -145,14 +143,13 @@ using (var scope = app.Services.CreateScope())
     {
         // Validate environment and database provider alignment for relational databases
         var currentProvider = context.Database.ProviderName;
-        var expectedProvider = environment.IsDevelopment() ? "Pomelo.EntityFrameworkCore.MySql" : "Microsoft.EntityFrameworkCore.SqlServer";
+        var expectedProvider = "Microsoft.EntityFrameworkCore.SqlServer";
         
         if (currentProvider != null && !currentProvider.Contains(expectedProvider.Split('.').Last()))
         {
-            var env = environment.IsDevelopment() ? "Development" : "Production";
-            var expected = environment.IsDevelopment() ? "MariaDb/MySQL" : "SQL Server";
+            var expected = "SQL Server";
             throw new InvalidOperationException(
-                $"Database provider mismatch! {env} environment expects {expected} but got {currentProvider}. " +
+                $"Database provider mismatch! Production environment expects {expected} but got {currentProvider}. " +
                 "Check your appsettings configuration.");
         }
         
@@ -168,33 +165,12 @@ using (var scope = app.Services.CreateScope())
                 // Database exists but is empty - create schema using EnsureCreated for cross-provider compatibility
                 await context.Database.EnsureCreatedAsync();
             }
-            else
-            {
-                // Database has tables - apply pending migrations only if using MySQL (migrations are MySQL-specific)
-                if (currentProvider != null && currentProvider.Contains("MySql"))
-                {
-                    var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-                    if (pendingMigrations.Any())
-                    {
-                        await context.Database.MigrateAsync();
-                    }
-                }
-                // For SQL Server with existing schema, skip migrations as they contain MySQL-specific code
-            }
+            // For SQL Server with existing schema, skip migrations as they may contain provider-specific code
         }
         else
         {
-            // Database doesn't exist - create it
-            if (currentProvider != null && currentProvider.Contains("MySql"))
-            {
-                // For MySQL, use migrations
-                await context.Database.MigrateAsync();
-            }
-            else
-            {
-                // For SQL Server, use EnsureCreated to avoid MySQL-specific migration issues
-                await context.Database.EnsureCreatedAsync();
-            }
+            // Database doesn't exist - create it using EnsureCreated for SQL Server
+            await context.Database.EnsureCreatedAsync();
         }
     }
     else
