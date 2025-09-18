@@ -27,7 +27,14 @@ namespace CveWebApp.Data
             // Set environment-specific defaults if not explicitly configured
             if (string.IsNullOrEmpty(dbProvider))
             {
-                dbProvider = environment.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "MariaDb" : "SqlServer";
+                dbProvider = environment.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "InMemory" : "SqlServer";
+            }
+
+            // For development, always use in-memory database
+            if (environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.UseInMemoryDatabase("DesignTimeDatabase");
+                return new ApplicationDbContext(builder.Options);
             }
 
             // Validate that we have a connection string for relational databases
@@ -38,17 +45,13 @@ namespace CveWebApp.Data
                     $"Please configure 'DefaultConnection' in appsettings.{environment}.json");
             }
 
-            if (dbProvider.Equals("MariaDb", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
-            }
-            else if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
             {
                 builder.UseSqlServer(connectionString);
             }
             else
             {
-                throw new Exception($"Unsupported DatabaseProvider: {dbProvider}. Supported providers: MariaDb, SqlServer");
+                throw new Exception($"Unsupported DatabaseProvider: {dbProvider}. Supported providers: SqlServer");
             }
 
             return new ApplicationDbContext(builder.Options);

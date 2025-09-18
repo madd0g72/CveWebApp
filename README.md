@@ -52,13 +52,12 @@ For development and testing purposes:
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- **Development**: [MariaDB](https://mariadb.org/) or MySQL (optional - uses in-memory database by default)  
 - **Production**: [SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) (required)
 
 ### Environment Setup
 
 > **Important**: This application uses different database providers for different environments:
-> - **Development**: MariaDB/MySQL (with in-memory fallback for testing)
+> - **Development**: In-memory database (for testing and development)
 > - **Production**: SQL Server Express
 > 
 > See [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed configuration instructions.
@@ -69,14 +68,6 @@ For development and testing purposes:
 ```bash
 git clone https://github.com/madd0g72/CVEWebApp.git
 cd CVEWebApp
-dotnet run --environment Development
-```
-
-#### Development (With MariaDB)
-```bash
-# 1. Install and start MariaDB/MySQL
-# 2. Update appsettings.Development.json with your connection string
-# 3. Run the application
 dotnet run --environment Development
 ```
 
@@ -182,10 +173,10 @@ For production deployment, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for 
 7. **Use environment variable** `ASPNETCORE_ENVIRONMENT=Production`
 
 **Environment Separation:**
-- ✅ **Development**: Uses MariaDB/MySQL (or in-memory for testing)
+- ✅ **Development**: Uses in-memory database (for testing and development)
 - ✅ **Production**: Uses SQL Server Express  
 - ✅ **Auto-validation**: Prevents database provider mismatches
-- ✅ **Idempotent migrations**: Safe database setup on first startup
+- ✅ **Schema management**: Uses EnsureCreated for database setup
 
 ## Contributing
 

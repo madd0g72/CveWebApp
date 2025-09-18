@@ -10,7 +10,6 @@ CVE Web Application is an ASP.NET Core MVC application for managing and importin
 
 ### Required Software
 - .NET 8 SDK (verified version: 8.0.119)
-- MariaDB/MySQL (optional - uses in-memory database by default)
 
 ### Initial Setup Commands
 ```bash
@@ -39,9 +38,8 @@ dotnet run --no-https    # Starts on http://localhost:5255 (~10 seconds startup)
 - Always use `--no-https` flag to avoid certificate issues in development
 
 ### Database Configuration
-- **In-memory (default)**: Remove `ConnectionStrings` from `appsettings.Development.json`
-- **MariaDB/MySQL**: Configure connection string in `appsettings.json` or `appsettings.Development.json`
-- **SQL Server**: Set `DatabaseProvider` to "SqlServer" in configuration
+- **In-memory (default)**: Always used for development environment
+- **SQL Server**: Set `DatabaseProvider` to "SqlServer" in configuration for production
 
 ## Testing & Validation
 
