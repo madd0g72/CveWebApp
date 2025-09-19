@@ -45,11 +45,11 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">CSV Format Requirements</h5>
+                <h5>CSV Format Requirements</h5>
             </div>
             <div class="card-body">
                 <p><strong>Required Headers:</strong></p>
-                <ul>
+                <ul class="small">
                     <li><code>Computer</code> - Server name</li>
                     <li><code>OSProduct</code> - Operating system</li>
                     <li><code>InstalledKBs</code> - Comma-separated KB numbers</li>
@@ -60,9 +60,11 @@
 SERVER01,Windows Server 2019,"925673,5005112,5007206"
 SERVER02,Windows Server 2022,"925673,5008123"</pre>
 
-                <p class="text-muted small">
-                    <strong>Note:</strong> All existing KB records for servers listed in the CSV will be replaced with the new data.
-                </p>
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Note:</strong> All existing KB records for servers listed in the CSV will be replaced with the new data.
+                    </small>
+                </div>
             </div>
         </div>
     </div>
