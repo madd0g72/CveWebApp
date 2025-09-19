@@ -84,6 +84,32 @@ namespace CveWebApp.Models
         [Display(Name = "Services")]
         public string? Services { get; set; }
 
+        // Additional status columns as requested
+        [StringLength(100)]
+        [Display(Name = "WSUS Status")]
+        public string? WSUSStatus { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "AD Status")]
+        public string? ADStatus { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "AV Status")]
+        public string? AVStatus { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "SIEM Status")]
+        public string? SIEMStatus { get; set; }
+
+        // Network information from VMWareServersNetworksList
+        [StringLength(2000)]
+        [Display(Name = "IP Addresses")]
+        public string? IPAddresses { get; set; }
+
+        [StringLength(2000)]
+        [Display(Name = "Port Groups")]
+        public string? PortGroups { get; set; }
+
         [Display(Name = "Created Date")]
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 

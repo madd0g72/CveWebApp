@@ -175,8 +175,8 @@ using (var scope = app.Services.CreateScope())
     
     if (app.Environment.IsDevelopment())
     {
-        // Removed automatic CSV data loading and test data seeding
-        // All data population must now happen via admin import functionality
+        // Seed sample VMWare data for testing
+        await SeedSampleVMWareDataAsync(context);
     }
 }
 
@@ -267,5 +267,179 @@ async Task SeedRolesAndUsersAsync(UserManager<ApplicationUser> userManager, Role
                 await userManager.AddToRoleAsync(testUser, "User");
             }
         }
+    }
+}
+
+/// <summary>
+/// Seeds sample VMWare data for development testing
+/// </summary>
+async Task SeedSampleVMWareDataAsync(ApplicationDbContext context)
+{
+    // Only seed if there's no VMWare data yet
+    if (!context.VMWareServerLists.Any())
+    {
+        var vmwareServers = new List<VMWareServerList>
+        {
+            new VMWareServerList
+            {
+                Service = "Web Services",
+                Location = "DataCenter-1",
+                Region = "East",
+                VCenter = "vcenter-east.company.local",
+                Cluster = "Web-Cluster-01",
+                VM = "web-server-01",
+                Status = "Running",
+                OS = "Microsoft Windows Server 2019 Standard",
+                ServiceOwner = "IT Operations",
+                Project = "WebPortal",
+                Environment = "Production",
+                IDEL = "WEB-PROD-01",
+                CreatedDate = DateTime.UtcNow.AddDays(-30)
+            },
+            new VMWareServerList
+            {
+                Service = "Database Services",
+                Location = "DataCenter-1", 
+                Region = "East",
+                VCenter = "vcenter-east.company.local",
+                Cluster = "DB-Cluster-01",
+                VM = "db-server-01",
+                Status = "Running",
+                OS = "Microsoft Windows Server 2022 Standard",
+                ServiceOwner = "Database Team",
+                Project = "CoreDB",
+                Environment = "Production",
+                IDEL = "DB-PROD-01",
+                CreatedDate = DateTime.UtcNow.AddDays(-45)
+            },
+            new VMWareServerList
+            {
+                Service = "Application Services",
+                Location = "DataCenter-2",
+                Region = "West", 
+                VCenter = "vcenter-west.company.local",
+                Cluster = "App-Cluster-01",
+                VM = "app-server-dev-01",
+                Status = "Running",
+                OS = "Ubuntu Server 20.04 LTS",
+                ServiceOwner = "Development Team",
+                Project = "DevOps",
+                Environment = "Development",
+                IDEL = "APP-DEV-01",
+                CreatedDate = DateTime.UtcNow.AddDays(-15)
+            }
+        };
+
+        context.VMWareServerLists.AddRange(vmwareServers);
+        await context.SaveChangesAsync();
+    }
+
+    // Seed network data
+    if (!context.VMWareServersNetworksLists.Any())
+    {
+        var networkData = new List<VMWareServersNetworksList>
+        {
+            // web-server-01 networks
+            new VMWareServersNetworksList
+            {
+                Service = "Web Services",
+                Location = "DataCenter-1",
+                Region = "East",
+                VCenter = "vcenter-east.company.local",
+                Cluster = "Web-Cluster-01",
+                VmName = "web-server-01",
+                OS = "Microsoft Windows Server 2019 Standard",
+                Status = "Running",
+                Owner = "IT Operations",
+                Tools = "Current",
+                MacAddress = "00:50:56:a1:23:45",
+                IpAddress = "192.168.100.10",
+                Connected = true,
+                PortGroup = "Web-VLAN-100",
+                Type = "E1000",
+                CreatedDate = DateTime.UtcNow.AddDays(-30)
+            },
+            new VMWareServersNetworksList
+            {
+                Service = "Web Services",
+                Location = "DataCenter-1",
+                Region = "East", 
+                VCenter = "vcenter-east.company.local",
+                Cluster = "Web-Cluster-01",
+                VmName = "web-server-01",
+                OS = "Microsoft Windows Server 2019 Standard",
+                Status = "Running",
+                Owner = "IT Operations",
+                Tools = "Current",
+                MacAddress = "00:50:56:a1:23:46",
+                IpAddress = "10.10.100.10",
+                Connected = true,
+                PortGroup = "Management-VLAN-10",
+                Type = "VMXNET3",
+                CreatedDate = DateTime.UtcNow.AddDays(-30)
+            },
+            // db-server-01 networks
+            new VMWareServersNetworksList
+            {
+                Service = "Database Services",
+                Location = "DataCenter-1",
+                Region = "East",
+                VCenter = "vcenter-east.company.local", 
+                Cluster = "DB-Cluster-01",
+                VmName = "db-server-01",
+                OS = "Microsoft Windows Server 2022 Standard",
+                Status = "Running",
+                Owner = "Database Team",
+                Tools = "Current",
+                MacAddress = "00:50:56:b2:34:56",
+                IpAddress = "192.168.200.20",
+                Connected = true,
+                PortGroup = "Database-VLAN-200",
+                Type = "VMXNET3",
+                CreatedDate = DateTime.UtcNow.AddDays(-45)
+            },
+            // app-server-dev-01 networks (multiple interfaces)
+            new VMWareServersNetworksList
+            {
+                Service = "Application Services", 
+                Location = "DataCenter-2",
+                Region = "West",
+                VCenter = "vcenter-west.company.local",
+                Cluster = "App-Cluster-01",
+                VmName = "app-server-dev-01",
+                OS = "Ubuntu Server 20.04 LTS",
+                Status = "Running",
+                Owner = "Development Team",
+                Tools = "Current",
+                MacAddress = "00:50:56:c3:45:67",
+                IpAddress = "172.16.50.30",
+                Connected = true,
+                PortGroup = "Dev-VLAN-50",
+                Type = "VMXNET3",
+                CreatedDate = DateTime.UtcNow.AddDays(-15)
+            },
+            new VMWareServersNetworksList
+            {
+                Service = "Application Services",
+                Location = "DataCenter-2",
+                Region = "West",
+                VCenter = "vcenter-west.company.local",
+                Cluster = "App-Cluster-01", 
+                VmName = "app-server-dev-01",
+                OS = "Ubuntu Server 20.04 LTS",
+                Status = "Running",
+                Owner = "Development Team",
+                Tools = "Current",
+                MacAddress = "00:50:56:c3:45:68",
+                IpAddress = "10.10.50.30",
+                Connected = true,
+                PortGroup = "Management-VLAN-10",
+                Type = "E1000",
+                CreatedDate = DateTime.UtcNow.AddDays(-15)
+            }
+        };
+
+        context.VMWareServersNetworksLists.AddRange(networkData);
+        await context.SaveChangesAsync();
     }
 }
