@@ -64,6 +64,23 @@ namespace CveWebApp.Controllers
                 .Take(pageSize)
                 .ToListAsync();
 
+            // Get servers that have KB data for WSUS status display
+            var serverNames = servers.Select(s => s.ServerName).ToList();
+            var serversWithKbData = await _context.ServerInstalledKbs
+                .Where(kb => serverNames.Contains(kb.Computer))
+                .Select(kb => kb.Computer)
+                .Distinct()
+                .ToListAsync();
+
+            // Update WSUS status for servers with KB data
+            foreach (var server in servers)
+            {
+                if (serversWithKbData.Contains(server.ServerName) && server.WSUSStatus == "Unknown")
+                {
+                    server.WSUSStatus = "Connected";
+                }
+            }
+
             var viewModel = new ServerListViewModel
             {
                 Servers = servers,
@@ -85,7 +102,6 @@ namespace CveWebApp.Controllers
         public async Task<IActionResult> Details(int id)
         {
             var server = await _context.Servers
-                .Include(s => s.InstalledKbs)
                 .FirstOrDefaultAsync(s => s.Id == id);
 
             if (server == null)
@@ -93,9 +109,23 @@ namespace CveWebApp.Controllers
                 return NotFound();
             }
 
+            // Get installed KBs by matching server name with Computer field
+            var installedKbs = await _context.ServerInstalledKbs
+                .Where(kb => kb.Computer == server.ServerName)
+                .ToListAsync();
+
+            // Update WSUS status based on presence of KB data
+            if (installedKbs.Any() && server.WSUSStatus == "Unknown")
+            {
+                server.WSUSStatus = "Connected";
+                _context.Servers.Update(server);
+                await _context.SaveChangesAsync();
+            }
+
             var viewModel = new ServerDetailsViewModel
             {
-                Server = server
+                Server = server,
+                InstalledKbs = installedKbs
             };
 
             return View(viewModel);
