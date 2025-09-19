@@ -87,6 +87,72 @@ namespace CveWebApp.Services
             }
         }
 
+        /// <summary>
+        /// Loads WSUS installed KBs CSV data into the ServerInstalledKbs table
+        /// </summary>
+        public async Task LoadWsusInstalledKbsAsync(string csvFilePath)
+        {
+            if (!File.Exists(csvFilePath))
+            {
+                _logger.LogWarning("WSUS CSV file not found: {FilePath}", csvFilePath);
+                return;
+            }
+
+            _logger.LogInformation("Loading WSUS installed KBs from: {FilePath}", csvFilePath);
+
+            var records = new List<ServerInstalledKb>();
+            var lines = await File.ReadAllLinesAsync(csvFilePath);
+            
+            if (lines.Length < 2)
+            {
+                _logger.LogWarning("WSUS CSV file has no data rows");
+                return;
+            }
+
+            // Skip header row
+            for (int i = 1; i < lines.Length; i++)
+            {
+                try
+                {
+                    var values = ParseCsvLine(lines[i]);
+                    if (values.Length >= 3)
+                    {
+                        var computer = values[0].Trim('"');
+                        var osProduct = values[1].Trim('"');
+                        var installedKbs = values[2].Trim('"');
+
+                        // Split the comma-separated KB list
+                        var kbArray = installedKbs.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                        
+                        foreach (var kb in kbArray)
+                        {
+                            var kbNumber = kb.Trim();
+                            if (!string.IsNullOrEmpty(kbNumber))
+                            {
+                                records.Add(new ServerInstalledKb
+                                {
+                                    Computer = computer,
+                                    OSProduct = osProduct,
+                                    KB = kbNumber
+                                });
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Error parsing WSUS CSV line {LineNumber}: {Error}", i + 1, ex.Message);
+                }
+            }
+
+            if (records.Any())
+            {
+                _context.ServerInstalledKbs.AddRange(records);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Loaded {Count} installed KB records for {ServerCount} servers", 
+                    records.Count, records.Select(r => r.Computer).Distinct().Count());
+            }
+        }
 
         /// <summary>
         /// Processes supersedence relationships from the loaded CVE data
