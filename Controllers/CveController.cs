@@ -271,11 +271,19 @@ namespace CveWebApp.Controllers
                 return viewModel;
             }
 
-            // Get all servers with matching OS products (server functionality removed - returns empty)
+            // Get all servers with matching OS products
             var matchingServers = await GetMatchingServersAsync(cveDetails.Product, cveDetails.ProductFamily);
 
-            // Server functionality has been removed - use empty server groups
-            var serverGroups = new List<ServerComplianceStatus>();
+            // Group servers by computer name and calculate compliance
+            var serverGroups = matchingServers
+                .GroupBy(s => new { s.Computer, s.OSProduct })
+                .Select(g => new ServerComplianceStatus
+                {
+                    Computer = g.Key.Computer,
+                    OSProduct = g.Key.OSProduct,
+                    InstalledKbs = g.Select(s => s.KB).Distinct().ToList()
+                })
+                .ToList();
 
             // Calculate compliance for each server with supersedence consideration
             foreach (var server in serverGroups)
@@ -602,8 +610,16 @@ namespace CveWebApp.Controllers
                 return GetDefaultComplianceBasedOnSeverity(cve.MaxSeverity);
             }
 
-            // Server functionality has been removed - use empty server groups
-            var serverGroups = new List<ServerComplianceStatus>();
+            // Group servers by computer name and calculate compliance
+            var serverGroups = matchingServers
+                .GroupBy(s => new { s.Computer, s.OSProduct })
+                .Select(g => new ServerComplianceStatus
+                {
+                    Computer = g.Key.Computer,
+                    OSProduct = g.Key.OSProduct,
+                    InstalledKbs = g.Select(s => s.KB).Distinct().ToList()
+                })
+                .ToList();
 
             // Calculate compliance for each server using the same supersedence logic as detailed view
             var compliantServers = 0;
@@ -637,11 +653,20 @@ namespace CveWebApp.Controllers
             };
         }
 
-        private async Task<List<ServerComplianceStatus>> GetMatchingServersAsync(string? product, string? productFamily)
+        private async Task<List<ServerInstalledKb>> GetMatchingServersAsync(string? product, string? productFamily)
         {
-            // Server functionality has been removed - return empty list
-            await Task.CompletedTask;
-            return new List<ServerComplianceStatus>();
+            var query = _context.ServerInstalledKbs.AsQueryable();
+
+            if (!string.IsNullOrEmpty(product))
+            {
+                query = query.Where(s => s.OSProduct.Contains(product));
+            }
+            else if (!string.IsNullOrEmpty(productFamily))
+            {
+                query = query.Where(s => s.OSProduct.Contains(productFamily));
+            }
+
+            return await query.ToListAsync();
         }
 
         // GET: Cve/Import - Admin only
