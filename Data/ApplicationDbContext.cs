@@ -20,6 +20,7 @@ namespace CveWebApp.Data
         public DbSet<KbSupersedence> KbSupersedences { get; set; }
         public DbSet<VMWareServerList> VMWareServerLists { get; set; }
         public DbSet<VMWareServersNetworksList> VMWareServersNetworksLists { get; set; }
+        public DbSet<Server> Servers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -109,6 +110,35 @@ namespace CveWebApp.Data
 
             modelBuilder.Entity<VMWareServersNetworksList>()
                 .HasIndex(e => e.IpAddress);
+
+            // Configure Server entity
+            modelBuilder.Entity<Server>()
+                .ToTable("Servers");
+
+            // Configure decimal precision for Server disk sizes
+            modelBuilder.Entity<Server>()
+                .Property(e => e.OSDiskSize)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Server>()
+                .Property(e => e.OSDiskFree)
+                .HasPrecision(18, 2);
+
+            // Create indexes for better query performance on Servers
+            modelBuilder.Entity<Server>()
+                .HasIndex(e => e.ServerName);
+
+            modelBuilder.Entity<Server>()
+                .HasIndex(e => e.Environment);
+
+            modelBuilder.Entity<Server>()
+                .HasIndex(e => e.Project);
+
+            modelBuilder.Entity<Server>()
+                .HasIndex(e => e.VCenter);
+
+            modelBuilder.Entity<Server>()
+                .HasIndex(e => e.Cluster);
         }
     }
 }

@@ -83,6 +83,28 @@
                                 <dd class="col-sm-8"><code>@Model.Server.ManagementIP</code></dd>
                             }
 
+                            @if (!string.IsNullOrEmpty(Model.Server.IPAddresses))
+                            {
+                                <dt class="col-sm-4">IP Addresses:</dt>
+                                <dd class="col-sm-8">
+                                    @foreach (var ip in Model.Server.IPAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <code class="me-2">@ip.Trim()</code>
+                                    }
+                                </dd>
+                            }
+
+                            @if (!string.IsNullOrEmpty(Model.Server.PortGroups))
+                            {
+                                <dt class="col-sm-4">Port Groups:</dt>
+                                <dd class="col-sm-8">
+                                    @foreach (var pg in Model.Server.PortGroups.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <span class="badge bg-info me-1">@pg.Trim()</span>
+                                    }
+                                </dd>
+                            }
+
                             @if (!string.IsNullOrEmpty(Model.Server.MaintenanceWindows))
                             {
                                 <dt class="col-sm-4">Maintenance:</dt>
@@ -162,6 +184,97 @@
                             <dt class="col-sm-4">Last Updated:</dt>
                             <dd class="col-sm-8">@Model.Server.LastUpdated.ToString("yyyy-MM-dd HH:mm")</dd>
                         </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-shield-alt"></i> System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <dl>
+                                    <dt>WSUS Status</dt>
+                                    <dd>
+                                        @if (!string.IsNullOrEmpty(Model.Server.WSUSStatus))
+                                        {
+                                            <span class="badge @(Model.Server.WSUSStatus == "Unknown" ? "bg-secondary" : 
+                                                                  Model.Server.WSUSStatus == "Connected" ? "bg-success" : 
+                                                                  Model.Server.WSUSStatus == "Disconnected" ? "bg-danger" : "bg-warning")">
+                                                @Model.Server.WSUSStatus
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Not Set</span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl>
+                                    <dt>AD Status</dt>
+                                    <dd>
+                                        @if (!string.IsNullOrEmpty(Model.Server.ADStatus))
+                                        {
+                                            <span class="badge @(Model.Server.ADStatus == "Unknown" ? "bg-secondary" : 
+                                                                  Model.Server.ADStatus == "Joined" ? "bg-success" : 
+                                                                  Model.Server.ADStatus == "Not Joined" ? "bg-danger" : "bg-warning")">
+                                                @Model.Server.ADStatus
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Not Set</span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl>
+                                    <dt>AV Status</dt>
+                                    <dd>
+                                        @if (!string.IsNullOrEmpty(Model.Server.AVStatus))
+                                        {
+                                            <span class="badge @(Model.Server.AVStatus == "Unknown" ? "bg-secondary" : 
+                                                                  Model.Server.AVStatus == "Protected" ? "bg-success" : 
+                                                                  Model.Server.AVStatus == "Unprotected" ? "bg-danger" : "bg-warning")">
+                                                @Model.Server.AVStatus
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Not Set</span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-3">
+                                <dl>
+                                    <dt>SIEM Status</dt>
+                                    <dd>
+                                        @if (!string.IsNullOrEmpty(Model.Server.SIEMStatus))
+                                        {
+                                            <span class="badge @(Model.Server.SIEMStatus == "Unknown" ? "bg-secondary" : 
+                                                                  Model.Server.SIEMStatus == "Connected" ? "bg-success" : 
+                                                                  Model.Server.SIEMStatus == "Disconnected" ? "bg-danger" : "bg-warning")">
+                                                @Model.Server.SIEMStatus
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Not Set</span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
