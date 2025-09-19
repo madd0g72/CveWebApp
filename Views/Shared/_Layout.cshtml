@@ -27,11 +27,6 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Cve" asp-action="Index">CVE Dashboard</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Server" asp-action="Index">
-                                <i class="fas fa-server"></i> Server Assets
-                            </a>
-                        </li>
                         
                         @* Admin-only import links - only visible to users in Admin role *@
                         @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
@@ -42,7 +37,6 @@
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                     <li><a class="dropdown-item" asp-area="" asp-controller="Cve" asp-action="Import">Import CVE Data</a></li>
-                                    <li><a class="dropdown-item" asp-area="" asp-controller="Server" asp-action="Import">Import Server Data</a></li>
                                     <li><a class="dropdown-item" asp-area="" asp-controller="KbImport" asp-action="Index">KB Import</a></li>
                                     <li><a class="dropdown-item" asp-area="" asp-controller="Cve" asp-action="Supersedence">KB Supersedence</a></li>
                                     <li><hr class="dropdown-divider"></li>
