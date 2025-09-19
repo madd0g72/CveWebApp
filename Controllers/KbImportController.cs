@@ -48,19 +48,31 @@ namespace CveWebApp.Controllers
                 var importResult = await ProcessCsvFileAsync(csvFile);
                 importResult.FileName = csvFile.FileName;
                 importResult.ExitCode = importResult.IsSuccessful ? 0 : 1;
-                return View("ImportResult", importResult);
+                
+                // Pass results via ViewBag to stay on Index view
+                ViewBag.ImportResult = importResult;
+                ViewBag.SuccessMessage = importResult.IsSuccessful ? "The KB data has been imported successfully." : null;
+                ViewBag.ErrorMessage = importResult.HasErrors ? "Some issues were encountered during the import process." : null;
+                ViewBag.Errors = importResult.HasErrors ? importResult.Errors : null;
+                
+                // Import summary data for footer
+                ViewBag.FileName = importResult.FileName;
+                ViewBag.ExitCode = importResult.ExitCode;
+                ViewBag.ImportStartTime = importResult.ImportStartTime;
+                ViewBag.ImportEndTime = importResult.ImportEndTime;
+                ViewBag.ProcessingDuration = importResult.ProcessingDuration?.TotalSeconds;
+                ViewBag.LinesProcessed = importResult.LinesProcessed;
+                ViewBag.ServersUpdated = importResult.ServersUpdated;
+                ViewBag.RecordsAdded = importResult.RecordsAdded;
+                ViewBag.RecordsRemoved = importResult.RecordsRemoved;
+                ViewBag.ErrorCount = importResult.ErrorCount;
+                
+                return View("Index");
             }
             catch (Exception ex)
             {
-                var errorResult = new KbImportResult
-                {
-                    FileName = csvFile.FileName,
-                    ExitCode = 1,
-                    ImportStartTime = DateTime.UtcNow,
-                    ImportEndTime = DateTime.UtcNow
-                };
-                errorResult.Errors.Add($"Error processing file: {ex.Message}");
-                return View("ImportResult", errorResult);
+                ViewBag.ErrorMessage = $"Error processing file: {ex.Message}";
+                return View("Index");
             }
         }
 

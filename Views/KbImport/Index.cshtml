@@ -1,55 +1,79 @@
 @{
-    ViewData["Title"] = "KB Import";
+    ViewData["Title"] = "Import Server Installed KBs";
 }
+
+<h1>Import Server Installed KBs</h1>
 
 <div class="row">
     <div class="col-md-8">
-        <h2>Import Server Installed KBs</h2>
-        <p class="text-muted">
-            Upload a CSV file containing installed KBs for each server. This will replace existing KB records for the servers in the file.
-        </p>
-
-        @if (!ViewData.ModelState.IsValid)
-        {
-            <div class="alert alert-danger">
-                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    <div>@error.ErrorMessage</div>
-                }
-            </div>
-        }
-
-        <div class="card">
+        <form asp-action="Upload" method="post" enctype="multipart/form-data" class="card">
             <div class="card-header">
-                <h5 class="mb-0">Upload CSV File</h5>
+                <h4>Upload CSV File</h4>
             </div>
             <div class="card-body">
-                <form asp-action="Upload" method="post" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="csvFile" class="form-label">Select CSV File</label>
-                        <input type="file" class="form-control" id="csvFile" name="csvFile" accept=".csv" required>
-                        <div class="form-text">
-                            Maximum file size: 10MB. File must have a .csv extension.
-                        </div>
+                @if (ViewBag.SuccessMessage != null)
+                {
+                    <div class="alert alert-success" role="alert">
+                        @ViewBag.SuccessMessage
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-upload"></i> Upload and Import
-                    </button>
-                    <a asp-controller="Cve" asp-action="Index" class="btn btn-secondary">Cancel</a>
-                </form>
+                }
+
+                @if (ViewBag.ErrorMessage != null)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @ViewBag.ErrorMessage
+                    </div>
+                }
+
+                @if (ViewBag.Errors != null)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <h6>Import Errors:</h6>
+                        <ul class="mb-0">
+                            @foreach (var error in ViewBag.Errors as List<string>)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger">
+                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                        {
+                            <div>@error.ErrorMessage</div>
+                        }
+                    </div>
+                }
+
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="form-group mb-3">
+                    <label for="csvFile" class="form-label">Select CSV File:</label>
+                    <input type="file" class="form-control" id="csvFile" name="csvFile" accept=".csv" required>
+                    <div class="form-text">
+                        Upload a CSV file containing installed KBs for each server. Maximum file size: 10MB.
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-upload"></i> Upload and Import
+                </button>
+                <a asp-controller="Cve" asp-action="Index" class="btn btn-secondary">Cancel</a>
             </div>
-        </div>
+        </form>
     </div>
 
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">CSV Format Requirements</h5>
+                <h5>CSV Format Requirements</h5>
             </div>
             <div class="card-body">
                 <p><strong>Required Headers:</strong></p>
-                <ul>
+                <ul class="small">
                     <li><code>Computer</code> - Server name</li>
                     <li><code>OSProduct</code> - Operating system</li>
                     <li><code>InstalledKBs</code> - Comma-separated KB numbers</li>
@@ -60,10 +84,76 @@
 SERVER01,Windows Server 2019,"925673,5005112,5007206"
 SERVER02,Windows Server 2022,"925673,5008123"</pre>
 
-                <p class="text-muted small">
-                    <strong>Note:</strong> All existing KB records for servers listed in the CSV will be replaced with the new data.
-                </p>
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Note:</strong> All existing KB records for servers listed in the CSV will be replaced with the new data.
+                    </small>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Import Results Footer -->
+@if (ViewBag.LinesProcessed != null || ViewBag.ErrorCount != null)
+{
+    <div class="card mt-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-bar"></i> Import Summary
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Import Details</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>File:</strong> @ViewBag.FileName</li>
+                        <li><strong>Exit Code:</strong> 
+                            @if (ViewBag.ExitCode == 0)
+                            {
+                                <span class="badge bg-success">0 (Success)</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">@ViewBag.ExitCode (Error)</span>
+                            }
+                        </li>
+                        @if (ViewBag.ProcessingDuration != null)
+                        {
+                            <li><strong>Processing Time:</strong> @(((double)ViewBag.ProcessingDuration).ToString("F1")) seconds</li>
+                        }
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Processing Results</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Lines Processed:</strong> @(ViewBag.LinesProcessed ?? 0)</li>
+                        <li><strong>Servers Updated:</strong> <span class="text-info">@(ViewBag.ServersUpdated ?? 0)</span></li>
+                        <li><strong>Records Added:</strong> <span class="text-success">@(ViewBag.RecordsAdded ?? 0)</span></li>
+                        <li><strong>Records Removed:</strong> <span class="text-warning">@(ViewBag.RecordsRemoved ?? 0)</span></li>
+                        <li><strong>Errors:</strong> <span class="text-danger">@(ViewBag.ErrorCount ?? 0)</span></li>
+                    </ul>
+                </div>
+            </div>
+            @if (ViewBag.ImportStartTime != null)
+            {
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <small class="text-muted">
+                            Import started: @(((DateTime)ViewBag.ImportStartTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC
+                            @if (ViewBag.ImportEndTime != null)
+                            {
+                                <span> | Completed: @(((DateTime)ViewBag.ImportEndTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC</span>
+                            }
+                        </small>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
