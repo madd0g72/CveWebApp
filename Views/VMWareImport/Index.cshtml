@@ -1,0 +1,239 @@
+@{
+    ViewData["Title"] = "Import VMWare Data";
+}
+
+<h1>Import VMWare Data</h1>
+
+<div class="row">
+    <div class="col-md-12">
+        <!-- VMWare Server List Import -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-server"></i> VMWare Server List Import</h4>
+            </div>
+            <div class="card-body">
+                <form asp-action="UploadServers" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    
+                    <div class="mb-3">
+                        <label for="csvFileServers" class="form-label">Select VMWare Server List CSV File</label>
+                        <input type="file" class="form-control" id="csvFileServers" name="csvFile" accept=".csv" required>
+                        <div class="form-text">Choose a CSV file containing VMWare server data. Maximum file size: 10MB</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-info" data-bs-toggle="collapse" data-bs-target="#serverCsvFormat">
+                            <i class="fas fa-info-circle"></i> Show CSV Format Info
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Import Server Data
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Collapsible CSV Format Information for Servers -->
+                <div id="serverCsvFormat" class="collapse mt-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6>VMWare Server List CSV Format</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Expected Headers (all optional, case-insensitive):</strong></p>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <ul class="small">
+                                        <li>Service</li>
+                                        <li>Location</li>
+                                        <li>Region</li>
+                                        <li>vCenter</li>
+                                        <li>Cluster</li>
+                                        <li>VM</li>
+                                        <li>ESXi</li>
+                                        <li>Status</li>
+                                        <li>OS</li>
+                                        <li>dnsName</li>
+                                        <li>TotCPU</li>
+                                        <li>Socket</li>
+                                        <li>Core</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <ul class="small">
+                                        <li>vMem</li>
+                                        <li>SizeGB</li>
+                                        <li>BackupVeeam</li>
+                                        <li>vHW</li>
+                                        <li>Tools_Status</li>
+                                        <li>Tools_Version</li>
+                                        <li>IP</li>
+                                        <li>VMX</li>
+                                        <li>Folder</li>
+                                        <li>RP</li>
+                                        <li>SCOPE</li>
+                                        <li>SUB_SCOPE</li>
+                                        <li>CUSTOMER</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <ul class="small">
+                                        <li>Owner</li>
+                                        <li>Group</li>
+                                        <li>Service_Owner</li>
+                                        <li>Service_Group</li>
+                                        <li>Project</li>
+                                        <li>CreationDate</li>
+                                        <li>VMCreationDate</li>
+                                        <li>Functionality</li>
+                                        <li>Deploy_from</li>
+                                        <li>IDEL</li>
+                                        <li>Environment</li>
+                                        <li>Priority</li>
+                                        <li>Note</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VMWare Server Networks Import -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-network-wired"></i> VMWare Server Networks Import</h4>
+            </div>
+            <div class="card-body">
+                <form asp-action="UploadNetworks" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    
+                    <div class="mb-3">
+                        <label for="csvFileNetworks" class="form-label">Select VMWare Server Networks CSV File</label>
+                        <input type="file" class="form-control" id="csvFileNetworks" name="csvFile" accept=".csv" required>
+                        <div class="form-text">Choose a CSV file containing VMWare server network data. Maximum file size: 10MB</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-info" data-bs-toggle="collapse" data-bs-target="#networkCsvFormat">
+                            <i class="fas fa-info-circle"></i> Show CSV Format Info
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Import Network Data
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Collapsible CSV Format Information for Networks -->
+                <div id="networkCsvFormat" class="collapse mt-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6>VMWare Server Networks CSV Format</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Expected Headers (all optional, case-insensitive):</strong></p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="small">
+                                        <li>Service</li>
+                                        <li>Location</li>
+                                        <li>Region</li>
+                                        <li>vCenter</li>
+                                        <li>Cluster</li>
+                                        <li>VmName</li>
+                                        <li>OS</li>
+                                        <li>Status</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="small">
+                                        <li>Owner</li>
+                                        <li>Tools</li>
+                                        <li>MacAddress</li>
+                                        <li>IpAddress</li>
+                                        <li>Connected (True/False)</li>
+                                        <li>PortGroup</li>
+                                        <li>Type</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Results -->
+        @if (ViewBag.ImportResult != null)
+        {
+            var result = ViewBag.ImportResult as CveWebApp.Controllers.VMWareImportResult;
+            <div class="card">
+                <div class="card-header @(result.IsSuccessful ? "bg-success text-white" : "bg-danger text-white")">
+                    <h5 class="mb-0">
+                        <i class="fas @(result.IsSuccessful ? "fa-check-circle" : "fa-exclamation-triangle")"></i>
+                        Import @(result.IsSuccessful ? "Successful" : "Failed")
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>File:</strong> @result.FileName</p>
+                    <p><strong>Records Imported:</strong> @result.RecordsImported</p>
+                    
+                    @if (result.Errors?.Any() == true)
+                    {
+                        <div class="alert alert-danger">
+                            <h6>Import Errors:</h6>
+                            <ul class="mb-0">
+                                @foreach (var error in result.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    
+                    @if (ViewBag.ImportStartTime != null)
+                    {
+                        <small class="text-muted">
+                            Import started: @(((DateTime)ViewBag.ImportStartTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC
+                            @if (ViewBag.ImportEndTime != null)
+                            {
+                                <span> | Completed: @(((DateTime)ViewBag.ImportEndTime).ToString("yyyy-MM-dd HH:mm:ss")) UTC</span>
+                            }
+                        </small>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Validation Errors -->
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger mt-3">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div>@error.ErrorMessage</div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Validate file size before upload
+        function validateFileSize(input) {
+            const file = input.files[0];
+            if (file && file.size > 10 * 1024 * 1024) { // 10MB
+                alert('File size must be less than 10MB');
+                input.value = '';
+            }
+        }
+
+        document.getElementById('csvFileServers').addEventListener('change', function(e) {
+            validateFileSize(e.target);
+        });
+
+        document.getElementById('csvFileNetworks').addEventListener('change', function(e) {
+            validateFileSize(e.target);
+        });
+    </script>
+}
