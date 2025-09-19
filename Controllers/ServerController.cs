@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CveWebApp.Data;
 using CveWebApp.Models;
+using CveWebApp.Services;
 using Microsoft.AspNetCore.Authorization;
 
 namespace CveWebApp.Controllers
@@ -65,9 +66,9 @@ namespace CveWebApp.Controllers
                 .ToListAsync();
 
             // Get servers that have KB data for WSUS status display
-            var serverNames = servers.Select(s => s.ServerName).ToList();
+            // Normalize server names for proper matching (remove domain suffixes)
+            var normalizedServerNames = servers.Select(s => ServerNameHelper.NormalizeServerName(s.ServerName)).ToList();
             var serversWithKbData = await _context.ServerInstalledKbs
-                .Where(kb => serverNames.Contains(kb.Computer))
                 .Select(kb => kb.Computer)
                 .Distinct()
                 .ToListAsync();
@@ -75,7 +76,11 @@ namespace CveWebApp.Controllers
             // Update WSUS status for servers with KB data
             foreach (var server in servers)
             {
-                if (serversWithKbData.Contains(server.ServerName) && server.WSUSStatus == "Unknown")
+                var normalizedServerName = ServerNameHelper.NormalizeServerName(server.ServerName);
+                var hasKbData = serversWithKbData.Any(kbComputer => 
+                    ServerNameHelper.DoServerNamesMatch(normalizedServerName, kbComputer));
+                
+                if (hasKbData && server.WSUSStatus == "Unknown")
                 {
                     server.WSUSStatus = "Connected";
                 }
@@ -109,10 +114,22 @@ namespace CveWebApp.Controllers
                 return NotFound();
             }
 
-            // Get installed KBs by matching server name with Computer field
+            // Get installed KBs by matching server name with Computer field (normalized for domain compatibility)
+            var normalizedServerName = ServerNameHelper.NormalizeServerName(server.ServerName);
+            
+            // First try exact match for performance
             var installedKbs = await _context.ServerInstalledKbs
                 .Where(kb => kb.Computer == server.ServerName)
                 .ToListAsync();
+                
+            // If no exact match found, try normalized matching
+            if (!installedKbs.Any())
+            {
+                var allKbs = await _context.ServerInstalledKbs.ToListAsync();
+                installedKbs = allKbs
+                    .Where(kb => ServerNameHelper.DoServerNamesMatch(normalizedServerName, kb.Computer))
+                    .ToList();
+            }
 
             // Update WSUS status based on presence of KB data
             if (installedKbs.Any() && server.WSUSStatus == "Unknown")
