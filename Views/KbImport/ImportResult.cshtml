@@ -15,7 +15,6 @@
 else if (Model.IsSuccessful)
 {
     <div class="alert alert-success">
-        <h4><i class="bi bi-check-circle"></i> Import Completed Successfully</h4>
         <p>The KB data has been imported successfully.</p>
     </div>
 }
@@ -30,47 +29,6 @@ else if (Model.HasErrors)
 @if (Model != null)
 {
     <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Import Summary</h5>
-                </div>
-                <div class="card-body">
-                    <table class="table table-sm">
-                        <tr>
-                            <td><strong>Lines Processed:</strong></td>
-                            <td>@Model.LinesProcessed</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Servers Updated:</strong></td>
-                            <td>@Model.ServersUpdated</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Records Removed:</strong></td>
-                            <td>@Model.RecordsRemoved</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Records Added:</strong></td>
-                            <td>@Model.RecordsAdded</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Errors:</strong></td>
-                            <td>
-                                @if (Model.HasErrors)
-                                {
-                                    <span class="text-danger">@Model.Errors.Count</span>
-                                }
-                                else
-                                {
-                                    <span class="text-success">0</span>
-                                }
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         @if (Model.HasErrors)
         {
             <div class="col-md-6">
