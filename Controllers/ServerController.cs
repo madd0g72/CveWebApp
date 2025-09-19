@@ -508,42 +508,73 @@ namespace CveWebApp.Controllers
         }
 
         /// <summary>
-        /// Get CVE records that apply to the specified operating system
+        /// Get CVE records that apply to the specified operating system with precise matching
         /// </summary>
         private async Task<List<CveUpdateStaging>> GetApplicableCvesAsync(string operatingSystem)
         {
-            // Match CVEs by product name contained in the operating system string
-            // This handles cases like:
-            // - OS: "Microsoft Windows Server 2019 Standard" -> matches Product: "Windows Server 2019"
-            // - OS: "Microsoft Windows Server 2022 Standard" -> matches Product: "Windows Server 2022"
+            // Improved matching logic to prevent over-broad CVE matches
+            // Only matches CVEs that are specifically relevant to the server's OS
             
             var query = _context.CveUpdateStagings.AsQueryable();
+            var cves = new List<CveUpdateStaging>();
 
-            // Try to find CVEs where the Product is contained in the OS string
-            var cves = await query
-                .Where(c => !string.IsNullOrEmpty(c.Product) && 
-                           operatingSystem.Contains(c.Product))
-                .ToListAsync();
-
-            // If no matches by Product, try ProductFamily
-            if (!cves.Any())
+            if (string.IsNullOrEmpty(operatingSystem))
             {
+                return cves; // Cannot determine applicable CVEs without OS information
+            }
+
+            var osLower = operatingSystem.ToLower();
+
+            // Step 1: Precise Product matching for Windows Server environments
+            if (osLower.Contains("windows server"))
+            {
+                // Extract Windows Server version from OS string for precise matching
+                var isServer2019 = osLower.Contains("2019");
+                var isServer2022 = osLower.Contains("2022");
+                var isServer2016 = osLower.Contains("2016");
+                
+                // Match CVEs that are specifically for this server version or generic server CVEs
+                cves = await query
+                    .Where(c => !string.IsNullOrEmpty(c.Product) && 
+                               (
+                                   // Exact version matches (high precision)
+                                   (isServer2019 && c.Product.ToLower().Contains("windows server 2019")) ||
+                                   (isServer2022 && c.Product.ToLower().Contains("windows server 2022")) ||
+                                   (isServer2016 && c.Product.ToLower().Contains("windows server 2016")) ||
+                                   // Generic Windows Server (no version specified) - applies to all server versions
+                                   (c.Product.ToLower() == "windows server")
+                               ))
+                    .ToListAsync();
+            }
+            // Step 2: For other Windows systems (not servers), match more precisely
+            else if (osLower.Contains("windows"))
+            {
+                // For other Windows systems, only match exact product names or specific Windows versions
+                // Avoid generic "Windows" matches for desktop/workstation systems
+                cves = await query
+                    .Where(c => !string.IsNullOrEmpty(c.Product) && 
+                               (
+                                   // Exact product matches
+                                   operatingSystem.Contains(c.Product) &&
+                                   // Exclude generic "Windows" - require more specificity  
+                                   c.Product.ToLower() != "windows"
+                               ))
+                    .ToListAsync();
+            }
+            // Step 3: Non-Windows systems - try ProductFamily matching only
+            else
+            {
+                // For non-Windows systems, be more restrictive and only match by ProductFamily
+                // This prevents Windows CVEs from being applied to Linux/Unix systems
                 cves = await query
                     .Where(c => !string.IsNullOrEmpty(c.ProductFamily) && 
-                               operatingSystem.Contains(c.ProductFamily))
+                               !c.ProductFamily.ToLower().Contains("windows") &&
+                               operatingSystem.ToLower().Contains(c.ProductFamily.ToLower()))
                     .ToListAsync();
             }
 
-            // If still no matches, try broader Windows matching
-            if (!cves.Any() && operatingSystem.ToLower().Contains("windows"))
-            {
-                cves = await query
-                    .Where(c => (c.Product != null && c.Product.ToLower().Contains("windows")) ||
-                               (c.ProductFamily != null && c.ProductFamily.ToLower().Contains("windows")))
-                    .ToListAsync();
-            }
-
-            return cves;
+            // Remove any duplicates that might have been added
+            return cves.GroupBy(c => c.Id).Select(g => g.First()).ToList();
         }
 
         /// <summary>
