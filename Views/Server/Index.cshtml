@@ -9,9 +9,17 @@
             <h2><i class="fas fa-server"></i> Server Assets</h2>
             @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
             {
-                <a asp-action="Import" class="btn btn-primary">
-                    <i class="fas fa-upload"></i> Import Servers
-                </a>
+                <div class="btn-group">
+                    <a asp-action="Import" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Import Servers
+                    </a>
+                    <form asp-action="AddTestData" method="post" style="display: inline-block;" onsubmit="return confirm('This will add test CVE and KB data. Continue?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="fas fa-flask"></i> Add Test Data
+                        </button>
+                    </form>
+                </div>
             }
         </div>
 
