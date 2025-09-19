@@ -251,6 +251,46 @@ namespace CveWebApp.Controllers
                         Details = "CVE-2023-9012",
                         BaseScore = 6.5m,
                         CustomerActionRequired = true
+                    },
+                    // Additional test CVEs to demonstrate the broad matching issue
+                    new CveUpdateStaging
+                    {
+                        ReleaseDate = DateTime.UtcNow.AddDays(-10),
+                        ProductFamily = "Windows",
+                        Product = "Windows", // Generic - should NOT match servers specifically
+                        Platform = "x64",
+                        Impact = "Remote Code Execution",
+                        MaxSeverity = "Critical",
+                        Article = "KB5001234: Security Update for Windows",
+                        Details = "CVE-2023-GENERIC",
+                        BaseScore = 8.8m,
+                        CustomerActionRequired = true
+                    },
+                    new CveUpdateStaging
+                    {
+                        ReleaseDate = DateTime.UtcNow.AddDays(-5),
+                        ProductFamily = "Windows",
+                        Product = "Windows 10", // Desktop OS - should NOT match servers
+                        Platform = "x64",
+                        Impact = "Elevation of Privilege",
+                        MaxSeverity = "Important",
+                        Article = "KB5002345: Security Update for Windows 10",
+                        Details = "CVE-2023-WIN10",
+                        BaseScore = 7.0m,
+                        CustomerActionRequired = true
+                    },
+                    new CveUpdateStaging
+                    {
+                        ReleaseDate = DateTime.UtcNow.AddDays(-20),
+                        ProductFamily = "Windows",
+                        Product = "Windows Server", // Vague - no version specified
+                        Platform = "x64",
+                        Impact = "Information Disclosure",
+                        MaxSeverity = "Important",
+                        Article = "KB5003456: Security Update for Windows Server",
+                        Details = "CVE-2023-WINSVR",
+                        BaseScore = 6.5m,
+                        CustomerActionRequired = true
                     }
                 };
 
