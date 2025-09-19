@@ -82,6 +82,7 @@
                             <th>Project</th>
                             <th>Operating System</th>
                             <th>Server IP</th>
+                            <th>WSUS Status</th>
                             <th>Service Owner</th>
                             <th>Last Updated</th>
                             <th>Actions</th>
@@ -113,10 +114,50 @@
                                     }
                                 </td>
                                 <td>
-                                    @server.ServerIP
-                                    @if (!string.IsNullOrEmpty(server.ManagementIP) && server.ManagementIP != server.ServerIP)
+                                    @if (!string.IsNullOrEmpty(server.IPAddresses))
                                     {
-                                        <br><small class="text-muted">Mgmt: @server.ManagementIP</small>
+                                        @foreach (var ip in server.IPAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries).Take(2))
+                                        {
+                                            <code class="me-1">@ip.Trim()</code>
+                                        }
+                                        @if (server.IPAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries).Length > 2)
+                                        {
+                                            <br><small class="text-muted">+@(server.IPAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries).Length - 2) more</small>
+                                        }
+                                    }
+                                    else if (!string.IsNullOrEmpty(server.ServerIP))
+                                    {
+                                        <code>@server.ServerIP</code>
+                                    }
+                                    else if (!string.IsNullOrEmpty(server.ManagementIP))
+                                    {
+                                        <code>@server.ManagementIP</code>
+                                        <br><small class="text-muted">Mgmt</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(server.WSUSStatus))
+                                    {
+                                        @if (server.WSUSStatus == "Connected")
+                                        {
+                                            <i class="fas fa-circle text-success" title="WSUS Connected"></i>
+                                            <span class="badge bg-success ms-1">@server.WSUSStatus</span>
+                                        }
+                                        else if (server.WSUSStatus == "Disconnected")
+                                        {
+                                            <i class="fas fa-circle text-danger" title="WSUS Disconnected"></i>
+                                            <span class="badge bg-danger ms-1">@server.WSUSStatus</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-circle text-secondary" title="WSUS Status Unknown"></i>
+                                            <span class="badge bg-secondary ms-1">@server.WSUSStatus</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-circle text-secondary" title="WSUS Status Not Set"></i>
+                                        <span class="badge bg-secondary ms-1">Not Set</span>
                                     }
                                 </td>
                                 <td>@server.ServiceOwner</td>
@@ -146,7 +187,8 @@
                         {
                             <li class="page-item">
                                 <a class="page-link" href="@Url.Action("Index", new { 
-                                    page = Model.PageNumber - 1, 
+                                    pageNumber = Model.PageNumber - 1, 
+                                    pageSize = Model.PageSize,
                                     environmentFilter = Model.EnvironmentFilter,
                                     projectFilter = Model.ProjectFilter,
                                     operatingSystemFilter = Model.OperatingSystemFilter,
@@ -159,7 +201,8 @@
                         {
                             <li class="page-item @(i == Model.PageNumber ? "active" : "")">
                                 <a class="page-link" href="@Url.Action("Index", new { 
-                                    page = i, 
+                                    pageNumber = i, 
+                                    pageSize = Model.PageSize,
                                     environmentFilter = Model.EnvironmentFilter,
                                     projectFilter = Model.ProjectFilter,
                                     operatingSystemFilter = Model.OperatingSystemFilter,
@@ -172,7 +215,8 @@
                         {
                             <li class="page-item">
                                 <a class="page-link" href="@Url.Action("Index", new { 
-                                    page = Model.PageNumber + 1, 
+                                    pageNumber = Model.PageNumber + 1, 
+                                    pageSize = Model.PageSize,
                                     environmentFilter = Model.EnvironmentFilter,
                                     projectFilter = Model.ProjectFilter,
                                     operatingSystemFilter = Model.OperatingSystemFilter,
